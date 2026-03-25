@@ -21,7 +21,7 @@ const chacheManagerInstances = new Map();
 const CACACHE_OPTIONS = {algorithms: ["sha256"]};
 
 // Cache version for compatibility management
-const CACHE_VERSION = "v0_2";
+const CACHE_VERSION = "v0_3_a";
 
 /**
  * Manages persistence for the build cache using file-based storage and cacache
@@ -160,14 +160,9 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeBuildManifest(projectId, buildSignature, manifest) {
-		const t = BuildTimings.start("writeBuildManifest");
-		try {
-			const manifestPath = this.#getBuildManifestPath(projectId, buildSignature);
-			await mkdir(path.dirname(manifestPath), {recursive: true});
-			await writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
-		} finally {
-			BuildTimings.end("writeBuildManifest", t);
-		}
+		const manifestPath = this.#getBuildManifestPath(projectId, buildSignature);
+		await mkdir(path.dirname(manifestPath), {recursive: true});
+		await writeFile(manifestPath, JSON.stringify(manifest), "utf8");
 	}
 
 	/**
@@ -229,14 +224,9 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeIndexCache(projectId, buildSignature, kind, index) {
-		const t = BuildTimings.start("writeIndexCache");
-		try {
-			const indexPath = this.#getIndexCachePath(projectId, buildSignature, kind);
-			await mkdir(path.dirname(indexPath), {recursive: true});
-			await writeFile(indexPath, JSON.stringify(index, null, 2), "utf8");
-		} finally {
-			BuildTimings.end("writeIndexCache", t);
-		}
+		const indexPath = this.#getIndexCachePath(projectId, buildSignature, kind);
+		await mkdir(path.dirname(indexPath), {recursive: true});
+		await writeFile(indexPath, JSON.stringify(index), "utf8");
 	}
 
 	/**
@@ -304,15 +294,10 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeStageCache(projectId, buildSignature, stageId, stageSignature, metadata) {
-		const t = BuildTimings.start("writeStageCache");
-		try {
-			const metadataPath = this.#getStageMetadataPath(
-				projectId, buildSignature, stageId, stageSignature);
-			await mkdir(path.dirname(metadataPath), {recursive: true});
-			await writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf8");
-		} finally {
-			BuildTimings.end("writeStageCache", t);
-		}
+		const metadataPath = this.#getStageMetadataPath(
+			projectId, buildSignature, stageId, stageSignature);
+		await mkdir(path.dirname(metadataPath), {recursive: true});
+		await writeFile(metadataPath, JSON.stringify(metadata), "utf8");
 	}
 
 	/**
@@ -378,14 +363,9 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeTaskMetadata(projectId, buildSignature, taskName, type, metadata) {
-		const t = BuildTimings.start("writeTaskMetadata");
-		try {
-			const metadataPath = this.#getTaskMetadataPath(projectId, buildSignature, taskName, type);
-			await mkdir(path.dirname(metadataPath), {recursive: true});
-			await writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf8");
-		} finally {
-			BuildTimings.end("writeTaskMetadata", t);
-		}
+		const metadataPath = this.#getTaskMetadataPath(projectId, buildSignature, taskName, type);
+		await mkdir(path.dirname(metadataPath), {recursive: true});
+		await writeFile(metadataPath, JSON.stringify(metadata), "utf8");
 	}
 
 	/**
@@ -449,15 +429,10 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeResultMetadata(projectId, buildSignature, stageSignature, metadata) {
-		const t = BuildTimings.start("writeResultMetadata");
-		try {
-			const metadataPath = this.#getResultMetadataPath(
-				projectId, buildSignature, stageSignature);
-			await mkdir(path.dirname(metadataPath), {recursive: true});
-			await writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf8");
-		} finally {
-			BuildTimings.end("writeResultMetadata", t);
-		}
+		const metadataPath = this.#getResultMetadataPath(
+			projectId, buildSignature, stageSignature);
+		await mkdir(path.dirname(metadataPath), {recursive: true});
+		await writeFile(metadataPath, JSON.stringify(metadata), "utf8");
 	}
 
 	/**

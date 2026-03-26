@@ -51,7 +51,7 @@ export default class TreeNode {
 		const obj = {
 			name: this.name,
 			type: this.type,
-			hash: this.hash ? this.hash.toString("hex") : null
+			hash: this.hash || null
 		};
 
 		if (this.type === "resource") {
@@ -78,7 +78,7 @@ export default class TreeNode {
 	 */
 	static fromJSON(data) {
 		const options = {
-			hash: data.hash ? Buffer.from(data.hash, "hex") : null,
+			hash: data.hash ? Buffer.from(data.hash) : null,
 			integrity: data.integrity,
 			lastModified: data.lastModified,
 			size: data.size,

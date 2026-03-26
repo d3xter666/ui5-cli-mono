@@ -1,14 +1,10 @@
 import cacache from "cacache";
 import path from "node:path";
-import fs from "graceful-fs";
 import {promisify} from "node:util";
 import {gzip} from "node:zlib";
-const mkdir = promisify(fs.mkdir);
-const readFile = promisify(fs.readFile);
-const writeFile = promisify(fs.writeFile);
 import os from "node:os";
 import Configuration from "../../config/Configuration.js";
-import {getPathFromPackageName} from "../../utils/sanitizeFileName.js";
+import MetadataStore from "./MetadataStore.js";
 import {getLogger} from "@ui5/logger";
 import BuildTimings from "./BuildTimings.js";
 
@@ -21,7 +17,7 @@ const chacheManagerInstances = new Map();
 const CACACHE_OPTIONS = {algorithms: ["sha256"]};
 
 // Cache version for compatibility management
-const CACHE_VERSION = "v0_2";
+const CACHE_VERSION = "v0_3_e";
 
 /**
  * Manages persistence for the build cache using file-based storage and cacache
@@ -48,29 +44,21 @@ const CACHE_VERSION = "v0_2";
  */
 export default class CacheManager {
 	#casDir;
-	#manifestDir;
-	#stageMetadataDir;
-	#taskMetadataDir;
-	#resultMetadataDir;
-	#indexDir;
+	#store;
 
 	/**
 	 * Creates a new CacheManager instance
 	 *
-	 * Initializes the directory structure for the cache. This constructor is private -
-	 * use CacheManager.create() instead to get a singleton instance.
+	 * Initializes CAS directory and opens the LevelDB metadata store.
+	 * This constructor is private - use CacheManager.create() instead.
 	 *
 	 * @private
-	 * @param {string} cacheDir Base directory for the cache
+	 * @param {string} casDir CAS directory path
+	 * @param {MetadataStore} store Opened MetadataStore instance
 	 */
-	constructor(cacheDir) {
-		cacheDir = path.join(cacheDir, CACHE_VERSION);
-		this.#casDir = path.join(cacheDir, "cas");
-		this.#manifestDir = path.join(cacheDir, "buildManifests");
-		this.#stageMetadataDir = path.join(cacheDir, "stageMetadata");
-		this.#taskMetadataDir = path.join(cacheDir, "taskMetadata");
-		this.#resultMetadataDir = path.join(cacheDir, "resultMetadata");
-		this.#indexDir = path.join(cacheDir, "index");
+	constructor(casDir, store) {
+		this.#casDir = casDir;
+		this.#store = store;
 	}
 
 	/**
@@ -102,21 +90,12 @@ export default class CacheManager {
 		log.verbose(`Using build cache directory: ${cacheDir}`);
 
 		if (!chacheManagerInstances.has(cacheDir)) {
-			chacheManagerInstances.set(cacheDir, new CacheManager(cacheDir));
+			const versionedDir = path.join(cacheDir, CACHE_VERSION);
+			const casDir = path.join(versionedDir, "cas");
+			const store = await MetadataStore.open(versionedDir);
+			chacheManagerInstances.set(cacheDir, new CacheManager(casDir, store));
 		}
 		return chacheManagerInstances.get(cacheDir);
-	}
-
-	/**
-	 * Generates the file path for a build manifest
-	 *
-	 * @param {string} packageName Package/project identifier
-	 * @param {string} buildSignature Build signature hash
-	 * @returns {string} Absolute path to the build manifest file
-	 */
-	#getBuildManifestPath(packageName, buildSignature) {
-		const pkgDir = getPathFromPackageName(packageName);
-		return path.join(this.#manifestDir, pkgDir, `${buildSignature}.json`);
 	}
 
 	/**
@@ -126,18 +105,12 @@ export default class CacheManager {
 	 * @param {string} projectId Project identifier (typically package name)
 	 * @param {string} buildSignature Build signature hash
 	 * @returns {Promise<object|null>} Parsed manifest object or null if not found
-	 * @throws {Error} If file read fails for reasons other than file not existing
 	 */
 	async readBuildManifest(projectId, buildSignature) {
 		const t = BuildTimings.start("readBuildManifest");
 		try {
-			const manifest = await readFile(this.#getBuildManifestPath(projectId, buildSignature), "utf8");
-			return JSON.parse(manifest);
+			return await this.#store.getBuildManifest(projectId, buildSignature);
 		} catch (err) {
-			if (err.code === "ENOENT") {
-				// Cache miss
-				return null;
-			}
 			throw new Error(`Failed to read build manifest for ` +
 				`${projectId} / ${buildSignature}: ${err.message}`, {
 				cause: err,
@@ -150,9 +123,6 @@ export default class CacheManager {
 	/**
 	 * Writes a build manifest to cache
 	 *
-	 * Creates parent directories if they don't exist. Manifests are stored as
-	 * formatted JSON (2-space indentation) for readability.
-	 *
 	 * @public
 	 * @param {string} projectId Project identifier (typically package name)
 	 * @param {string} buildSignature Build signature hash
@@ -160,52 +130,23 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeBuildManifest(projectId, buildSignature, manifest) {
-		const t = BuildTimings.start("writeBuildManifest");
-		try {
-			const manifestPath = this.#getBuildManifestPath(projectId, buildSignature);
-			await mkdir(path.dirname(manifestPath), {recursive: true});
-			await writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
-		} finally {
-			BuildTimings.end("writeBuildManifest", t);
-		}
-	}
-
-	/**
-	 * Generates the file path for resource index metadata
-	 *
-	 * @param {string} packageName Package/project identifier
-	 * @param {string} buildSignature Build signature hash
-	 * @param {string} kind "source" or "result"
-	 * @returns {string} Absolute path to the index metadata file
-	 */
-	#getIndexCachePath(packageName, buildSignature, kind) {
-		const pkgDir = getPathFromPackageName(packageName);
-		return path.join(this.#indexDir, pkgDir, `${kind}-${buildSignature}.json`);
+		await this.#store.putBuildManifest(projectId, buildSignature, manifest);
 	}
 
 	/**
 	 * Reads resource index cache from storage
-	 *
-	 * The index cache contains the resource tree structure and task metadata,
-	 * enabling efficient change detection and cache validation.
 	 *
 	 * @public
 	 * @param {string} projectId Project identifier (typically package name)
 	 * @param {string} buildSignature Build signature hash
 	 * @param {string} kind "source" or "result"
 	 * @returns {Promise<object|null>} Parsed index cache object or null if not found
-	 * @throws {Error} If file read fails for reasons other than file not existing
 	 */
 	async readIndexCache(projectId, buildSignature, kind) {
 		const t = BuildTimings.start("readIndexCache");
 		try {
-			const metadata = await readFile(this.#getIndexCachePath(projectId, buildSignature, kind), "utf8");
-			return JSON.parse(metadata);
+			return await this.#store.getIndexCache(projectId, buildSignature, kind);
 		} catch (err) {
-			if (err.code === "ENOENT") {
-				// Cache miss
-				return null;
-			}
 			throw new Error(`Failed to read resource index cache for ` +
 				`${projectId} / ${buildSignature}: ${err.message}`, {
 				cause: err,
@@ -218,9 +159,6 @@ export default class CacheManager {
 	/**
 	 * Writes resource index cache to storage
 	 *
-	 * Persists the resource index and associated task metadata for later retrieval.
-	 * Creates parent directories if needed.
-	 *
 	 * @public
 	 * @param {string} projectId Project identifier (typically package name)
 	 * @param {string} buildSignature Build signature hash
@@ -229,36 +167,11 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeIndexCache(projectId, buildSignature, kind, index) {
-		const t = BuildTimings.start("writeIndexCache");
-		try {
-			const indexPath = this.#getIndexCachePath(projectId, buildSignature, kind);
-			await mkdir(path.dirname(indexPath), {recursive: true});
-			await writeFile(indexPath, JSON.stringify(index, null, 2), "utf8");
-		} finally {
-			BuildTimings.end("writeIndexCache", t);
-		}
-	}
-
-	/**
-	 * Generates the file path for stage metadata
-	 *
-	 * @param {string} packageName Package/project identifier
-	 * @param {string} buildSignature Build signature hash
-	 * @param {string} stageId Stage identifier (e.g., "result" or "task/taskName")
-	 * @param {string} stageSignature Stage signature hash (based on input resources)
-	 * @returns {string} Absolute path to the stage metadata file
-	 */
-	#getStageMetadataPath(packageName, buildSignature, stageId, stageSignature) {
-		const pkgDir = getPathFromPackageName(packageName);
-		stageId = stageId.replace("/", "_");
-		return path.join(this.#stageMetadataDir, pkgDir, buildSignature, stageId, `${stageSignature}.json`);
+		await this.#store.putIndexCache(projectId, buildSignature, kind, index);
 	}
 
 	/**
 	 * Reads stage metadata from cache
-	 *
-	 * Stage metadata contains information about resources produced by a build stage,
-	 * including resource paths and their metadata.
 	 *
 	 * @public
 	 * @param {string} projectId Project identifier (typically package name)
@@ -266,20 +179,12 @@ export default class CacheManager {
 	 * @param {string} stageId Stage identifier (e.g., "result" or "task/taskName")
 	 * @param {string} stageSignature Stage signature hash (based on input resources)
 	 * @returns {Promise<object|null>} Parsed stage metadata or null if not found
-	 * @throws {Error} If file read fails for reasons other than file not existing
 	 */
 	async readStageCache(projectId, buildSignature, stageId, stageSignature) {
 		const t = BuildTimings.start("readStageCache");
 		try {
-			const metadata = await readFile(
-				this.#getStageMetadataPath(projectId, buildSignature, stageId, stageSignature
-				), "utf8");
-			return JSON.parse(metadata);
+			return await this.#store.getStageMetadata(projectId, buildSignature, stageId, stageSignature);
 		} catch (err) {
-			if (err.code === "ENOENT") {
-				// Cache miss
-				return null;
-			}
 			throw new Error(`Failed to read stage metadata from cache for ` +
 				`${projectId} / ${buildSignature} / ${stageId} / ${stageSignature}: ${err.message}`, {
 				cause: err,
@@ -292,9 +197,6 @@ export default class CacheManager {
 	/**
 	 * Writes stage metadata to cache
 	 *
-	 * Persists metadata about resources produced by a build stage.
-	 * Creates parent directories if needed.
-	 *
 	 * @public
 	 * @param {string} projectId Project identifier (typically package name)
 	 * @param {string} buildSignature Build signature hash
@@ -304,36 +206,11 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeStageCache(projectId, buildSignature, stageId, stageSignature, metadata) {
-		const t = BuildTimings.start("writeStageCache");
-		try {
-			const metadataPath = this.#getStageMetadataPath(
-				projectId, buildSignature, stageId, stageSignature);
-			await mkdir(path.dirname(metadataPath), {recursive: true});
-			await writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf8");
-		} finally {
-			BuildTimings.end("writeStageCache", t);
-		}
-	}
-
-	/**
-	 * Generates the file path for task metadata
-	 *
-	 * @param {string} packageName Package/project identifier
-	 * @param {string} buildSignature Build signature hash
-	 * @param {string} taskName Task name
-	 * @param {string} type "project" or "dependency"
-	 * @returns {string} Absolute path to the task metadata file
-	 */
-	#getTaskMetadataPath(packageName, buildSignature, taskName, type) {
-		const pkgDir = getPathFromPackageName(packageName);
-		return path.join(this.#taskMetadataDir, pkgDir, buildSignature, taskName, `${type}.json`);
+		await this.#store.putStageMetadata(projectId, buildSignature, stageId, stageSignature, metadata);
 	}
 
 	/**
 	 * Reads task metadata from cache
-	 *
-	 * Task metadata contains resource request graphs and indices for tracking
-	 * which resources a task accessed during execution.
 	 *
 	 * @public
 	 * @param {string} projectId Project identifier (typically package name)
@@ -341,19 +218,12 @@ export default class CacheManager {
 	 * @param {string} taskName Task name
 	 * @param {string} type "project" or "dependency"
 	 * @returns {Promise<object|null>} Parsed task metadata or null if not found
-	 * @throws {Error} If file read fails for reasons other than file not existing
 	 */
 	async readTaskMetadata(projectId, buildSignature, taskName, type) {
 		const t = BuildTimings.start("readTaskMetadata");
 		try {
-			const metadata = await readFile(
-				this.#getTaskMetadataPath(projectId, buildSignature, taskName, type), "utf8");
-			return JSON.parse(metadata);
+			return await this.#store.getTaskMetadata(projectId, buildSignature, taskName, type);
 		} catch (err) {
-			if (err.code === "ENOENT") {
-				// Cache miss
-				return null;
-			}
 			throw new Error(`Failed to read task metadata from cache for ` +
 				`${projectId} / ${buildSignature} / ${taskName} / ${type}: ${err.message}`, {
 				cause: err,
@@ -366,9 +236,6 @@ export default class CacheManager {
 	/**
 	 * Writes task metadata to cache
 	 *
-	 * Persists task-specific metadata including resource request graphs and indices.
-	 * Creates parent directories if needed.
-	 *
 	 * @public
 	 * @param {string} projectId Project identifier (typically package name)
 	 * @param {string} buildSignature Build signature hash
@@ -378,54 +245,23 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeTaskMetadata(projectId, buildSignature, taskName, type, metadata) {
-		const t = BuildTimings.start("writeTaskMetadata");
-		try {
-			const metadataPath = this.#getTaskMetadataPath(projectId, buildSignature, taskName, type);
-			await mkdir(path.dirname(metadataPath), {recursive: true});
-			await writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf8");
-		} finally {
-			BuildTimings.end("writeTaskMetadata", t);
-		}
-	}
-
-	/**
-	 * Generates the file path for result metadata
-	 *
-	 * @param {string} packageName Package/project identifier
-	 * @param {string} buildSignature Build signature hash
-	 * @param {string} stageSignature Stage signature hash (based on input resources)
-	 * @returns {string} Absolute path to the result metadata file
-	 */
-	#getResultMetadataPath(packageName, buildSignature, stageSignature) {
-		const pkgDir = getPathFromPackageName(packageName);
-		return path.join(this.#resultMetadataDir, pkgDir, buildSignature, `${stageSignature}.json`);
+		await this.#store.putTaskMetadata(projectId, buildSignature, taskName, type, metadata);
 	}
 
 	/**
 	 * Reads result metadata from cache
-	 *
-	 * Result metadata contains information about the final build output, including
-	 * references to all stage signatures that comprise the result.
 	 *
 	 * @public
 	 * @param {string} projectId Project identifier (typically package name)
 	 * @param {string} buildSignature Build signature hash
 	 * @param {string} stageSignature Stage signature hash (based on input resources)
 	 * @returns {Promise<object|null>} Parsed result metadata or null if not found
-	 * @throws {Error} If file read fails for reasons other than file not existing
 	 */
 	async readResultMetadata(projectId, buildSignature, stageSignature) {
 		const t = BuildTimings.start("readResultMetadata");
 		try {
-			const metadata = await readFile(
-				this.#getResultMetadataPath(projectId, buildSignature, stageSignature
-				), "utf8");
-			return JSON.parse(metadata);
+			return await this.#store.getResultMetadata(projectId, buildSignature, stageSignature);
 		} catch (err) {
-			if (err.code === "ENOENT") {
-				// Cache miss
-				return null;
-			}
 			throw new Error(`Failed to read stage metadata from cache for ` +
 				`${projectId} / ${buildSignature} / ${stageSignature}: ${err.message}`, {
 				cause: err,
@@ -438,9 +274,6 @@ export default class CacheManager {
 	/**
 	 * Writes result metadata to cache
 	 *
-	 * Persists metadata about the final build result, including stage signature mappings.
-	 * Creates parent directories if needed.
-	 *
 	 * @public
 	 * @param {string} projectId Project identifier (typically package name)
 	 * @param {string} buildSignature Build signature hash
@@ -449,15 +282,14 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeResultMetadata(projectId, buildSignature, stageSignature, metadata) {
-		const t = BuildTimings.start("writeResultMetadata");
-		try {
-			const metadataPath = this.#getResultMetadataPath(
-				projectId, buildSignature, stageSignature);
-			await mkdir(path.dirname(metadataPath), {recursive: true});
-			await writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf8");
-		} finally {
-			BuildTimings.end("writeResultMetadata", t);
-		}
+		await this.#store.putResultMetadata(projectId, buildSignature, stageSignature, metadata);
+	}
+
+	/**
+	 * Close the metadata store. Should be called when the build is complete.
+	 */
+	async close() {
+		await this.#store.close();
 	}
 
 	/**

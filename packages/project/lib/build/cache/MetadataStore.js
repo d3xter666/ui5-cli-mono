@@ -1,15 +1,14 @@
 import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "graceful-fs";
-import {promisify} from "node:util";
-const mkdir = promisify(fs.mkdir);
+import {pack, unpack} from "msgpackr";
 
 /**
  * SQLite-based metadata store for build cache.
  *
  * Provides a key-value interface backed by a single SQLite database file.
  * Each metadata category maps to a table with composite TEXT keys and a
- * TEXT value column (JSON).
+ * BLOB value column (MessagePack).
  *
  * WAL mode is enabled for concurrent read performance.
  */
@@ -42,14 +41,14 @@ export default class MetadataStore {
 			CREATE TABLE IF NOT EXISTS build_manifests (
 				project_id TEXT NOT NULL,
 				build_signature TEXT NOT NULL,
-				value TEXT NOT NULL,
+				value BLOB NOT NULL,
 				PRIMARY KEY (project_id, build_signature)
 			);
 			CREATE TABLE IF NOT EXISTS index_cache (
 				project_id TEXT NOT NULL,
 				build_signature TEXT NOT NULL,
 				kind TEXT NOT NULL,
-				value TEXT NOT NULL,
+				value BLOB NOT NULL,
 				PRIMARY KEY (project_id, build_signature, kind)
 			);
 			CREATE TABLE IF NOT EXISTS stage_metadata (
@@ -57,7 +56,7 @@ export default class MetadataStore {
 				build_signature TEXT NOT NULL,
 				stage_id TEXT NOT NULL,
 				stage_signature TEXT NOT NULL,
-				value TEXT NOT NULL,
+				value BLOB NOT NULL,
 				PRIMARY KEY (project_id, build_signature, stage_id, stage_signature)
 			);
 			CREATE TABLE IF NOT EXISTS task_metadata (
@@ -65,14 +64,14 @@ export default class MetadataStore {
 				build_signature TEXT NOT NULL,
 				task_name TEXT NOT NULL,
 				type TEXT NOT NULL,
-				value TEXT NOT NULL,
+				value BLOB NOT NULL,
 				PRIMARY KEY (project_id, build_signature, task_name, type)
 			);
 			CREATE TABLE IF NOT EXISTS result_metadata (
 				project_id TEXT NOT NULL,
 				build_signature TEXT NOT NULL,
 				stage_signature TEXT NOT NULL,
-				value TEXT NOT NULL,
+				value BLOB NOT NULL,
 				PRIMARY KEY (project_id, build_signature, stage_signature)
 			);
 		`);
@@ -128,34 +127,34 @@ export default class MetadataStore {
 
 	getBuildManifest(projectId, buildSignature) {
 		const row = this.#stmts.getBuildManifest.get(projectId, buildSignature);
-		return row ? JSON.parse(row.value) : null;
+		return row ? unpack(row.value) : null;
 	}
 
 	putBuildManifest(projectId, buildSignature, data) {
-		this.#stmts.putBuildManifest.run(projectId, buildSignature, JSON.stringify(data));
+		this.#stmts.putBuildManifest.run(projectId, buildSignature, pack(data));
 	}
 
 	// --- Index Cache ---
 
 	getIndexCache(projectId, buildSignature, kind) {
 		const row = this.#stmts.getIndexCache.get(projectId, buildSignature, kind);
-		return row ? JSON.parse(row.value) : null;
+		return row ? unpack(row.value) : null;
 	}
 
 	putIndexCache(projectId, buildSignature, kind, data) {
-		this.#stmts.putIndexCache.run(projectId, buildSignature, kind, JSON.stringify(data));
+		this.#stmts.putIndexCache.run(projectId, buildSignature, kind, pack(data));
 	}
 
 	// --- Stage Metadata ---
 
 	getStageMetadata(projectId, buildSignature, stageId, stageSignature) {
 		const row = this.#stmts.getStageMetadata.get(projectId, buildSignature, stageId, stageSignature);
-		return row ? JSON.parse(row.value) : null;
+		return row ? unpack(row.value) : null;
 	}
 
 	putStageMetadata(projectId, buildSignature, stageId, stageSignature, data) {
 		this.#stmts.putStageMetadata.run(
-			projectId, buildSignature, stageId, stageSignature, JSON.stringify(data)
+			projectId, buildSignature, stageId, stageSignature, pack(data)
 		);
 	}
 
@@ -163,12 +162,12 @@ export default class MetadataStore {
 
 	getTaskMetadata(projectId, buildSignature, taskName, type) {
 		const row = this.#stmts.getTaskMetadata.get(projectId, buildSignature, taskName, type);
-		return row ? JSON.parse(row.value) : null;
+		return row ? unpack(row.value) : null;
 	}
 
 	putTaskMetadata(projectId, buildSignature, taskName, type, data) {
 		this.#stmts.putTaskMetadata.run(
-			projectId, buildSignature, taskName, type, JSON.stringify(data)
+			projectId, buildSignature, taskName, type, pack(data)
 		);
 	}
 
@@ -176,12 +175,12 @@ export default class MetadataStore {
 
 	getResultMetadata(projectId, buildSignature, stageSignature) {
 		const row = this.#stmts.getResultMetadata.get(projectId, buildSignature, stageSignature);
-		return row ? JSON.parse(row.value) : null;
+		return row ? unpack(row.value) : null;
 	}
 
 	putResultMetadata(projectId, buildSignature, stageSignature, data) {
 		this.#stmts.putResultMetadata.run(
-			projectId, buildSignature, stageSignature, JSON.stringify(data)
+			projectId, buildSignature, stageSignature, pack(data)
 		);
 	}
 

@@ -3,9 +3,13 @@ import path from "node:path";
 import fs from "graceful-fs";
 import {promisify} from "node:util";
 import {gzip} from "node:zlib";
+import {finished} from "node:stream/promises";
+import {parser} from "stream-json";
+import {chain} from "stream-chain";
+import {assembler as makeAssembler} from "stream-json/Assembler.js";
+import {disassembler} from "stream-json/Disassembler.js";
+import stringer from "stream-json/Stringer.js";
 const mkdir = promisify(fs.mkdir);
-const readFile = promisify(fs.readFile);
-const writeFile = promisify(fs.writeFile);
 import os from "node:os";
 import Configuration from "../../config/Configuration.js";
 import {getPathFromPackageName} from "../../utils/sanitizeFileName.js";
@@ -21,7 +25,39 @@ const chacheManagerInstances = new Map();
 const CACACHE_OPTIONS = {algorithms: ["sha256"]};
 
 // Cache version for compatibility management
-const CACHE_VERSION = "v0_2";
+const CACHE_VERSION = "v0_3_f";
+
+/**
+ * Read a JSON file using streaming parser (no full buffering).
+ * Returns null on ENOENT (cache miss).
+ */
+async function streamReadJson(filePath) {
+	return new Promise((resolve, reject) => {
+		const pipe = chain([fs.createReadStream(filePath), parser()]);
+		const asm = makeAssembler();
+		asm.connectTo(pipe);
+		pipe.on("error", (err) => {
+			if (err.code === "ENOENT") {
+				resolve(null);
+			} else {
+				reject(err);
+			}
+		});
+		asm.on("done", (asm) => resolve(asm.current));
+	});
+}
+
+/**
+ * Write a JavaScript object to a JSON file using streaming serializer.
+ * Creates parent directories if needed.
+ */
+async function streamWriteJson(filePath, data) {
+	await mkdir(path.dirname(filePath), {recursive: true});
+	const ws = chain([disassembler(), stringer(), fs.createWriteStream(filePath)]);
+	ws.write(data);
+	ws.end();
+	await finished(ws);
+}
 
 /**
  * Manages persistence for the build cache using file-based storage and cacache
@@ -131,13 +167,8 @@ export default class CacheManager {
 	async readBuildManifest(projectId, buildSignature) {
 		const t = BuildTimings.start("readBuildManifest");
 		try {
-			const manifest = await readFile(this.#getBuildManifestPath(projectId, buildSignature), "utf8");
-			return JSON.parse(manifest);
+			return await streamReadJson(this.#getBuildManifestPath(projectId, buildSignature));
 		} catch (err) {
-			if (err.code === "ENOENT") {
-				// Cache miss
-				return null;
-			}
 			throw new Error(`Failed to read build manifest for ` +
 				`${projectId} / ${buildSignature}: ${err.message}`, {
 				cause: err,
@@ -160,14 +191,7 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeBuildManifest(projectId, buildSignature, manifest) {
-		const t = BuildTimings.start("writeBuildManifest");
-		try {
-			const manifestPath = this.#getBuildManifestPath(projectId, buildSignature);
-			await mkdir(path.dirname(manifestPath), {recursive: true});
-			await writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
-		} finally {
-			BuildTimings.end("writeBuildManifest", t);
-		}
+		await streamWriteJson(this.#getBuildManifestPath(projectId, buildSignature), manifest);
 	}
 
 	/**
@@ -199,13 +223,8 @@ export default class CacheManager {
 	async readIndexCache(projectId, buildSignature, kind) {
 		const t = BuildTimings.start("readIndexCache");
 		try {
-			const metadata = await readFile(this.#getIndexCachePath(projectId, buildSignature, kind), "utf8");
-			return JSON.parse(metadata);
+			return await streamReadJson(this.#getIndexCachePath(projectId, buildSignature, kind));
 		} catch (err) {
-			if (err.code === "ENOENT") {
-				// Cache miss
-				return null;
-			}
 			throw new Error(`Failed to read resource index cache for ` +
 				`${projectId} / ${buildSignature}: ${err.message}`, {
 				cause: err,
@@ -229,14 +248,7 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeIndexCache(projectId, buildSignature, kind, index) {
-		const t = BuildTimings.start("writeIndexCache");
-		try {
-			const indexPath = this.#getIndexCachePath(projectId, buildSignature, kind);
-			await mkdir(path.dirname(indexPath), {recursive: true});
-			await writeFile(indexPath, JSON.stringify(index, null, 2), "utf8");
-		} finally {
-			BuildTimings.end("writeIndexCache", t);
-		}
+		await streamWriteJson(this.#getIndexCachePath(projectId, buildSignature, kind), index);
 	}
 
 	/**
@@ -271,15 +283,9 @@ export default class CacheManager {
 	async readStageCache(projectId, buildSignature, stageId, stageSignature) {
 		const t = BuildTimings.start("readStageCache");
 		try {
-			const metadata = await readFile(
-				this.#getStageMetadataPath(projectId, buildSignature, stageId, stageSignature
-				), "utf8");
-			return JSON.parse(metadata);
+			return await streamReadJson(
+				this.#getStageMetadataPath(projectId, buildSignature, stageId, stageSignature));
 		} catch (err) {
-			if (err.code === "ENOENT") {
-				// Cache miss
-				return null;
-			}
 			throw new Error(`Failed to read stage metadata from cache for ` +
 				`${projectId} / ${buildSignature} / ${stageId} / ${stageSignature}: ${err.message}`, {
 				cause: err,
@@ -304,15 +310,8 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeStageCache(projectId, buildSignature, stageId, stageSignature, metadata) {
-		const t = BuildTimings.start("writeStageCache");
-		try {
-			const metadataPath = this.#getStageMetadataPath(
-				projectId, buildSignature, stageId, stageSignature);
-			await mkdir(path.dirname(metadataPath), {recursive: true});
-			await writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf8");
-		} finally {
-			BuildTimings.end("writeStageCache", t);
-		}
+		await streamWriteJson(
+			this.#getStageMetadataPath(projectId, buildSignature, stageId, stageSignature), metadata);
 	}
 
 	/**
@@ -346,14 +345,9 @@ export default class CacheManager {
 	async readTaskMetadata(projectId, buildSignature, taskName, type) {
 		const t = BuildTimings.start("readTaskMetadata");
 		try {
-			const metadata = await readFile(
-				this.#getTaskMetadataPath(projectId, buildSignature, taskName, type), "utf8");
-			return JSON.parse(metadata);
+			return await streamReadJson(
+				this.#getTaskMetadataPath(projectId, buildSignature, taskName, type));
 		} catch (err) {
-			if (err.code === "ENOENT") {
-				// Cache miss
-				return null;
-			}
 			throw new Error(`Failed to read task metadata from cache for ` +
 				`${projectId} / ${buildSignature} / ${taskName} / ${type}: ${err.message}`, {
 				cause: err,
@@ -378,14 +372,8 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeTaskMetadata(projectId, buildSignature, taskName, type, metadata) {
-		const t = BuildTimings.start("writeTaskMetadata");
-		try {
-			const metadataPath = this.#getTaskMetadataPath(projectId, buildSignature, taskName, type);
-			await mkdir(path.dirname(metadataPath), {recursive: true});
-			await writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf8");
-		} finally {
-			BuildTimings.end("writeTaskMetadata", t);
-		}
+		await streamWriteJson(
+			this.#getTaskMetadataPath(projectId, buildSignature, taskName, type), metadata);
 	}
 
 	/**
@@ -417,15 +405,9 @@ export default class CacheManager {
 	async readResultMetadata(projectId, buildSignature, stageSignature) {
 		const t = BuildTimings.start("readResultMetadata");
 		try {
-			const metadata = await readFile(
-				this.#getResultMetadataPath(projectId, buildSignature, stageSignature
-				), "utf8");
-			return JSON.parse(metadata);
+			return await streamReadJson(
+				this.#getResultMetadataPath(projectId, buildSignature, stageSignature));
 		} catch (err) {
-			if (err.code === "ENOENT") {
-				// Cache miss
-				return null;
-			}
 			throw new Error(`Failed to read stage metadata from cache for ` +
 				`${projectId} / ${buildSignature} / ${stageSignature}: ${err.message}`, {
 				cause: err,
@@ -449,15 +431,8 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeResultMetadata(projectId, buildSignature, stageSignature, metadata) {
-		const t = BuildTimings.start("writeResultMetadata");
-		try {
-			const metadataPath = this.#getResultMetadataPath(
-				projectId, buildSignature, stageSignature);
-			await mkdir(path.dirname(metadataPath), {recursive: true});
-			await writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf8");
-		} finally {
-			BuildTimings.end("writeResultMetadata", t);
-		}
+		await streamWriteJson(
+			this.#getResultMetadataPath(projectId, buildSignature, stageSignature), metadata);
 	}
 
 	/**

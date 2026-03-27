@@ -48,16 +48,12 @@ export default class MetadataStore {
 	// --- Build Manifests ---
 
 	async getBuildManifest(projectId, buildSignature) {
-		try {
-			const buf = await this.#sublevels.buildManifests.get(
-				MetadataStore.#key(projectId, buildSignature));
-			return unpack(buf);
-		} catch (err) {
-			if (err.code === "LEVEL_NOT_FOUND") {
-				return null;
-			}
-			throw err;
+		const buf = await this.#sublevels.buildManifests.get(
+			MetadataStore.#key(projectId, buildSignature));
+		if (buf === undefined) {
+			return null;
 		}
+		return unpack(buf);
 	}
 
 	async putBuildManifest(projectId, buildSignature, data) {
@@ -68,16 +64,12 @@ export default class MetadataStore {
 	// --- Index Cache ---
 
 	async getIndexCache(projectId, buildSignature, kind) {
-		try {
-			const buf = await this.#sublevels.indexCache.get(
-				MetadataStore.#key(projectId, buildSignature, kind));
-			return unpack(buf);
-		} catch (err) {
-			if (err.code === "LEVEL_NOT_FOUND") {
-				return null;
-			}
-			throw err;
+		const buf = await this.#sublevels.indexCache.get(
+			MetadataStore.#key(projectId, buildSignature, kind));
+		if (buf === undefined) {
+			return null;
 		}
+		return unpack(buf);
 	}
 
 	async putIndexCache(projectId, buildSignature, kind, data) {
@@ -88,16 +80,12 @@ export default class MetadataStore {
 	// --- Stage Metadata ---
 
 	async getStageMetadata(projectId, buildSignature, stageId, stageSignature) {
-		try {
-			const buf = await this.#sublevels.stageMetadata.get(
-				MetadataStore.#key(projectId, buildSignature, stageId, stageSignature));
-			return unpack(buf);
-		} catch (err) {
-			if (err.code === "LEVEL_NOT_FOUND") {
-				return null;
-			}
-			throw err;
+		const buf = await this.#sublevels.stageMetadata.get(
+			MetadataStore.#key(projectId, buildSignature, stageId, stageSignature));
+		if (buf === undefined) {
+			return null;
 		}
+		return unpack(buf);
 	}
 
 	async putStageMetadata(projectId, buildSignature, stageId, stageSignature, data) {
@@ -108,16 +96,12 @@ export default class MetadataStore {
 	// --- Task Metadata ---
 
 	async getTaskMetadata(projectId, buildSignature, taskName, type) {
-		try {
-			const buf = await this.#sublevels.taskMetadata.get(
-				MetadataStore.#key(projectId, buildSignature, taskName, type));
-			return unpack(buf);
-		} catch (err) {
-			if (err.code === "LEVEL_NOT_FOUND") {
-				return null;
-			}
-			throw err;
+		const buf = await this.#sublevels.taskMetadata.get(
+			MetadataStore.#key(projectId, buildSignature, taskName, type));
+		if (buf === undefined) {
+			return null;
 		}
+		return unpack(buf);
 	}
 
 	async putTaskMetadata(projectId, buildSignature, taskName, type, data) {
@@ -128,16 +112,12 @@ export default class MetadataStore {
 	// --- Result Metadata ---
 
 	async getResultMetadata(projectId, buildSignature, stageSignature) {
-		try {
-			const buf = await this.#sublevels.resultMetadata.get(
-				MetadataStore.#key(projectId, buildSignature, stageSignature));
-			return unpack(buf);
-		} catch (err) {
-			if (err.code === "LEVEL_NOT_FOUND") {
-				return null;
-			}
-			throw err;
+		const buf = await this.#sublevels.resultMetadata.get(
+			MetadataStore.#key(projectId, buildSignature, stageSignature));
+		if (buf === undefined) {
+			return null;
 		}
+		return unpack(buf);
 	}
 
 	async putResultMetadata(projectId, buildSignature, stageSignature, data) {

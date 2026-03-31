@@ -146,6 +146,7 @@ export default class CacheManager {
 		} finally {
 			BuildTimings.end("readBuildManifest", t);
 		}
+	
 	}
 
 	/**
@@ -161,9 +162,16 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeBuildManifest(projectId, buildSignature, manifest) {
-		const manifestPath = this.#getBuildManifestPath(projectId, buildSignature);
-		await mkdir(path.dirname(manifestPath), {recursive: true});
-		await writeFile(manifestPath, pack(manifest));
+		const t = BuildTimings.start("writeBuildManifest");
+		try {
+			const manifestPath = this.#getBuildManifestPath(projectId, buildSignature);
+			await mkdir(path.dirname(manifestPath), {recursive: true});
+			await writeFile(manifestPath, pack(manifest));
+	
+		} finally {
+			BuildTimings.end("writeBuildManifest", t);
+		}
+	
 	}
 
 	/**
@@ -209,6 +217,7 @@ export default class CacheManager {
 		} finally {
 			BuildTimings.end("readIndexCache", t);
 		}
+	
 	}
 
 	/**
@@ -225,9 +234,16 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeIndexCache(projectId, buildSignature, kind, index) {
-		const indexPath = this.#getIndexCachePath(projectId, buildSignature, kind);
-		await mkdir(path.dirname(indexPath), {recursive: true});
-		await writeFile(indexPath, pack(index));
+		const t = BuildTimings.start("writeIndexCache");
+		try {
+			const indexPath = this.#getIndexCachePath(projectId, buildSignature, kind);
+			await mkdir(path.dirname(indexPath), {recursive: true});
+			await writeFile(indexPath, pack(index));
+	
+		} finally {
+			BuildTimings.end("writeIndexCache", t);
+		}
+	
 	}
 
 	/**
@@ -278,6 +294,7 @@ export default class CacheManager {
 		} finally {
 			BuildTimings.end("readStageCache", t);
 		}
+	
 	}
 
 	/**
@@ -295,10 +312,17 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeStageCache(projectId, buildSignature, stageId, stageSignature, metadata) {
-		const metadataPath = this.#getStageMetadataPath(
-			projectId, buildSignature, stageId, stageSignature);
-		await mkdir(path.dirname(metadataPath), {recursive: true});
-		await writeFile(metadataPath, pack(metadata));
+		const t = BuildTimings.start("writeStageCache");
+		try {
+			const metadataPath = this.#getStageMetadataPath(
+				projectId, buildSignature, stageId, stageSignature);
+			await mkdir(path.dirname(metadataPath), {recursive: true});
+			await writeFile(metadataPath, pack(metadata));
+	
+		} finally {
+			BuildTimings.end("writeStageCache", t);
+		}
+	
 	}
 
 	/**
@@ -347,6 +371,7 @@ export default class CacheManager {
 		} finally {
 			BuildTimings.end("readTaskMetadata", t);
 		}
+	
 	}
 
 	/**
@@ -364,9 +389,16 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeTaskMetadata(projectId, buildSignature, taskName, type, metadata) {
-		const metadataPath = this.#getTaskMetadataPath(projectId, buildSignature, taskName, type);
-		await mkdir(path.dirname(metadataPath), {recursive: true});
-		await writeFile(metadataPath, pack(metadata));
+		const t = BuildTimings.start("writeTaskMetadata");
+		try {
+			const metadataPath = this.#getTaskMetadataPath(projectId, buildSignature, taskName, type);
+			await mkdir(path.dirname(metadataPath), {recursive: true});
+			await writeFile(metadataPath, pack(metadata));
+	
+		} finally {
+			BuildTimings.end("writeTaskMetadata", t);
+		}
+	
 	}
 
 	/**
@@ -414,6 +446,7 @@ export default class CacheManager {
 		} finally {
 			BuildTimings.end("readResultMetadata", t);
 		}
+	
 	}
 
 	/**
@@ -430,10 +463,17 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeResultMetadata(projectId, buildSignature, stageSignature, metadata) {
-		const metadataPath = this.#getResultMetadataPath(
-			projectId, buildSignature, stageSignature);
-		await mkdir(path.dirname(metadataPath), {recursive: true});
-		await writeFile(metadataPath, pack(metadata));
+		const t = BuildTimings.start("writeResultMetadata");
+		try {
+			const metadataPath = this.#getResultMetadataPath(
+				projectId, buildSignature, stageSignature);
+			await mkdir(path.dirname(metadataPath), {recursive: true});
+			await writeFile(metadataPath, pack(metadata));
+	
+		} finally {
+			BuildTimings.end("writeResultMetadata", t);
+		}
+	
 	}
 
 	/**
@@ -453,19 +493,22 @@ export default class CacheManager {
 	 * @throws {Error} If integrity is not provided
 	 */
 	async getResourcePathForStage(buildSignature, stageId, stageSignature, resourcePath, integrity) {
-		if (!integrity) {
-			throw new Error("Integrity hash must be provided to read from cache");
-		}
 		const t = BuildTimings.start("getResourcePathForStage");
 		try {
+			if (!integrity) {
+				throw new Error("Integrity hash must be provided to read from cache");
+			}
+			// const cacheKey = this.#createKeyForStage(buildSignature, stageId, stageSignature, resourcePath, integrity);
 			const result = await cacache.get.info(this.#casDir, integrity);
 			if (!result) {
 				return null;
 			}
 			return result.path;
+	
 		} finally {
 			BuildTimings.end("getResourcePathForStage", t);
 		}
+	
 	}
 
 	/**
@@ -502,8 +545,10 @@ export default class CacheManager {
 					CACACHE_OPTIONS
 				);
 			}
+	
 		} finally {
 			BuildTimings.end("writeStageResource", t);
 		}
+	
 	}
 }

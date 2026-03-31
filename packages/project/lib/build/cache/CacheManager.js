@@ -176,6 +176,7 @@ export default class CacheManager {
 		} finally {
 			BuildTimings.end("readBuildManifest", t);
 		}
+	
 	}
 
 	/**
@@ -191,7 +192,14 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeBuildManifest(projectId, buildSignature, manifest) {
-		await streamWriteJson(this.#getBuildManifestPath(projectId, buildSignature), manifest);
+		const t = BuildTimings.start("writeBuildManifest");
+		try {
+			await streamWriteJson(this.#getBuildManifestPath(projectId, buildSignature), manifest);
+	
+		} finally {
+			BuildTimings.end("writeBuildManifest", t);
+		}
+	
 	}
 
 	/**
@@ -232,6 +240,7 @@ export default class CacheManager {
 		} finally {
 			BuildTimings.end("readIndexCache", t);
 		}
+	
 	}
 
 	/**
@@ -248,7 +257,14 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeIndexCache(projectId, buildSignature, kind, index) {
-		await streamWriteJson(this.#getIndexCachePath(projectId, buildSignature, kind), index);
+		const t = BuildTimings.start("writeIndexCache");
+		try {
+			await streamWriteJson(this.#getIndexCachePath(projectId, buildSignature, kind), index);
+	
+		} finally {
+			BuildTimings.end("writeIndexCache", t);
+		}
+	
 	}
 
 	/**
@@ -293,6 +309,7 @@ export default class CacheManager {
 		} finally {
 			BuildTimings.end("readStageCache", t);
 		}
+	
 	}
 
 	/**
@@ -310,8 +327,15 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeStageCache(projectId, buildSignature, stageId, stageSignature, metadata) {
-		await streamWriteJson(
-			this.#getStageMetadataPath(projectId, buildSignature, stageId, stageSignature), metadata);
+		const t = BuildTimings.start("writeStageCache");
+		try {
+			await streamWriteJson(
+				this.#getStageMetadataPath(projectId, buildSignature, stageId, stageSignature), metadata);
+	
+		} finally {
+			BuildTimings.end("writeStageCache", t);
+		}
+	
 	}
 
 	/**
@@ -355,6 +379,7 @@ export default class CacheManager {
 		} finally {
 			BuildTimings.end("readTaskMetadata", t);
 		}
+	
 	}
 
 	/**
@@ -372,8 +397,15 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeTaskMetadata(projectId, buildSignature, taskName, type, metadata) {
-		await streamWriteJson(
-			this.#getTaskMetadataPath(projectId, buildSignature, taskName, type), metadata);
+		const t = BuildTimings.start("writeTaskMetadata");
+		try {
+			await streamWriteJson(
+				this.#getTaskMetadataPath(projectId, buildSignature, taskName, type), metadata);
+	
+		} finally {
+			BuildTimings.end("writeTaskMetadata", t);
+		}
+	
 	}
 
 	/**
@@ -415,6 +447,7 @@ export default class CacheManager {
 		} finally {
 			BuildTimings.end("readResultMetadata", t);
 		}
+	
 	}
 
 	/**
@@ -431,8 +464,15 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeResultMetadata(projectId, buildSignature, stageSignature, metadata) {
-		await streamWriteJson(
-			this.#getResultMetadataPath(projectId, buildSignature, stageSignature), metadata);
+		const t = BuildTimings.start("writeResultMetadata");
+		try {
+			await streamWriteJson(
+				this.#getResultMetadataPath(projectId, buildSignature, stageSignature), metadata);
+	
+		} finally {
+			BuildTimings.end("writeResultMetadata", t);
+		}
+	
 	}
 
 	/**
@@ -452,19 +492,22 @@ export default class CacheManager {
 	 * @throws {Error} If integrity is not provided
 	 */
 	async getResourcePathForStage(buildSignature, stageId, stageSignature, resourcePath, integrity) {
-		if (!integrity) {
-			throw new Error("Integrity hash must be provided to read from cache");
-		}
 		const t = BuildTimings.start("getResourcePathForStage");
 		try {
+			if (!integrity) {
+				throw new Error("Integrity hash must be provided to read from cache");
+			}
+			// const cacheKey = this.#createKeyForStage(buildSignature, stageId, stageSignature, resourcePath, integrity);
 			const result = await cacache.get.info(this.#casDir, integrity);
 			if (!result) {
 				return null;
 			}
 			return result.path;
+	
 		} finally {
 			BuildTimings.end("getResourcePathForStage", t);
 		}
+	
 	}
 
 	/**
@@ -501,8 +544,10 @@ export default class CacheManager {
 					CACACHE_OPTIONS
 				);
 			}
+	
 		} finally {
 			BuildTimings.end("writeStageResource", t);
 		}
+	
 	}
 }

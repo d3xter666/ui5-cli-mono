@@ -3,6 +3,7 @@ import * as resourceFactory from "@ui5/fs/resourceFactory";
 import BuildLogger from "@ui5/logger/internal/loggers/Build";
 import composeProjectList from "./helpers/composeProjectList.js";
 import BuildContext from "./helpers/BuildContext.js";
+import CacheManager from "./cache/CacheManager.js";
 import prettyHrtime from "pretty-hrtime";
 import OutputStyleEnum from "./helpers/ProjectBuilderOutputStyle.js";
 import BuildTimings from "./cache/BuildTimings.js";
@@ -359,6 +360,7 @@ class ProjectBuilder {
 			throw err;
 		} finally {
 			await Promise.all(pCacheWrites);
+			await CacheManager.closeAll();
 			this._deregisterCleanupSigHooks(cleanupSigHooks);
 			await this._executeCleanupTasks();
 			this.#buildIsRunning = false;

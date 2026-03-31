@@ -292,6 +292,19 @@ export default class CacheManager {
 	}
 
 	/**
+	 * Close all singleton CacheManager instances and flush pending writes to disk.
+	 * Must be called before process exit to ensure LevelDB data is persisted.
+	 *
+	 * @public
+	 * @returns {Promise<void>}
+	 */
+	static async closeAll() {
+		const instances = Array.from(chacheManagerInstances.values());
+		chacheManagerInstances.clear();
+		await Promise.all(instances.map((instance) => instance.close()));
+	}
+
+	/**
 	 * Retrieves the file system path for a cached resource
 	 *
 	 * Looks up a resource in the content-addressable storage using its cache key

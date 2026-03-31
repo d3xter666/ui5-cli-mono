@@ -263,11 +263,7 @@ class ProjectBuildContext {
 			await this.getTaskRunner().getRequiredDependencies(),
 			true, // Force creation of new reader since project readers might have changed during their (re-)build
 		);
-		if (this._log.isLevelEnabled("perf")) {
-			this._log.perf(
-				`getDependenciesReader completed in ${(performance.now() - readerStart).toFixed(2)} ms`);
-		}
-		const cacheStart = performance.now();
+
 		const boolOrChangedPaths = await this.getBuildCache().prepareProjectBuildAndValidateCache(depReader);
 		if (this._log.isLevelEnabled("perf")) {
 			this._log.perf(

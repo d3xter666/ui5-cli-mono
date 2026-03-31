@@ -404,14 +404,7 @@ class ResourceRequestManager {
 	 *   each containing added, updated, unchanged, and removed resource paths
 	 */
 	async #flushTreeChanges() {
-		const flushStart = log.isLevelEnabled("perf") ? performance.now() : 0;
 		const results = await Promise.all(this.#treeRegistries.map((registry) => registry.flush()));
-		if (log.isLevelEnabled("perf")) {
-			log.perf(
-				`#flushTreeChanges for task '${this.#taskName}' of project '${this.#projectName}' ` +
-				`completed in ${(performance.now() - flushStart).toFixed(2)} ms ` +
-				`across ${this.#treeRegistries.length} registries`);
-		}
 		return results;
 	}
 

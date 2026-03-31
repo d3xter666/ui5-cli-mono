@@ -188,15 +188,21 @@ export default class MetadataStore {
 		const ts = fields.get(joinKey(prefix, "ts"));
 		const tv = fields.get(joinKey(prefix, "tv"));
 
-		// Tasks
+		// Tasks — store with ordinal prefix to preserve execution order
 		const tasks = [];
 		const taskPrefix = joinKey(prefix, "task") + SEP;
 		for (const [k, v] of entries) {
 			if (k.startsWith(taskPrefix)) {
-				const taskName = k.slice(taskPrefix.length);
-				tasks.push([taskName, Number(v)]);
+				const rest = k.slice(taskPrefix.length);
+				// key format: <ordinal>!<taskName>
+				const sep = rest.indexOf(SEP);
+				const ordinal = Number(rest.slice(0, sep));
+				const taskName = rest.slice(sep + 1);
+				tasks.push([ordinal, taskName, Number(v)]);
 			}
 		}
+		// Sort by ordinal to restore original execution order
+		tasks.sort((a, b) => a[0] - b[0]);
 
 		// Tree
 		const treePrefix = joinKey(prefix, "tree") + SEP;
@@ -205,7 +211,7 @@ export default class MetadataStore {
 		return {
 			indexTimestamp: ts != null ? Number(ts) : undefined,
 			indexTree: {version: tv != null ? Number(tv) : 1, root: treeRoot},
-			tasks,
+			tasks: tasks.map(([, taskName, supportsDiff]) => [taskName, supportsDiff]),
 		};
 	}
 
@@ -217,10 +223,11 @@ export default class MetadataStore {
 		ops.push({type: "put", key: joinKey(prefix, "ts"), value: String(data.indexTimestamp)});
 		ops.push({type: "put", key: joinKey(prefix, "tv"), value: String(data.indexTree?.version ?? 1)});
 
-		// Tasks
+		// Tasks — store with ordinal prefix to preserve execution order
 		if (data.tasks) {
-			for (const [taskName, supportsDiff] of data.tasks) {
-				ops.push({type: "put", key: joinKey(prefix, "task", taskName), value: String(supportsDiff)});
+			for (let i = 0; i < data.tasks.length; i++) {
+				const [taskName, supportsDiff] = data.tasks[i];
+				ops.push({type: "put", key: joinKey(prefix, "task", String(i), taskName), value: String(supportsDiff)});
 			}
 		}
 
@@ -245,10 +252,27 @@ export default class MetadataStore {
 
 		const stageSignatures = Object.create(null);
 		const sigsPrefix = joinKey(prefix, "sig") + SEP;
+		// Collect stage entries with their ordinals for correct ordering
+		const orderedStages = [];
 		for (const [k, v] of entries) {
 			if (k.startsWith(sigsPrefix)) {
-				stageSignatures[k.slice(sigsPrefix.length)] = v;
+				const rest = k.slice(sigsPrefix.length);
+				const sepIdx = rest.indexOf(SEP);
+				if (sepIdx !== -1) {
+					// New format: sig!<ordinal>!<name>
+					const ordinal = Number(rest.slice(0, sepIdx));
+					const name = rest.slice(sepIdx + 1);
+					orderedStages.push({ordinal, name, value: v});
+				} else {
+					// Legacy format: sig!<name> (no ordinal)
+					orderedStages.push({ordinal: -1, name: rest, value: v});
+				}
 			}
+		}
+		// Sort by ordinal to preserve original execution order
+		orderedStages.sort((a, b) => a.ordinal - b.ordinal);
+		for (const {name, value} of orderedStages) {
+			stageSignatures[name] = value;
 		}
 
 		return {
@@ -265,8 +289,10 @@ export default class MetadataStore {
 		ops.push({type: "put", key: joinKey(prefix, "source"), value: data.sourceStageSignature});
 
 		if (data.stageSignatures) {
+			let ordinal = 0;
 			for (const [name, chain] of Object.entries(data.stageSignatures)) {
-				ops.push({type: "put", key: joinKey(prefix, "sig", name), value: chain});
+				ops.push({type: "put", key: joinKey(prefix, "sig", String(ordinal), name), value: chain});
+				ordinal++;
 			}
 		}
 

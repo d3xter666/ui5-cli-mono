@@ -430,9 +430,12 @@ export default class TreeRegistry {
 							);
 
 							if (!isUnchanged) {
-								resourceNode.integrity = await upsert.resource.getIntegrity();
-								resourceNode.lastModified = upsert.resource.getLastModified();
-								resourceNode.size = await upsert.resource.getSize();
+								const resLM = upsert.resource.getLastModified();
+								const resSize = await upsert.resource.getSize();
+								const resIntegrity = await upsert.resource.getIntegrity();
+								resourceNode.integrity = resIntegrity;
+								resourceNode.lastModified = resLM;
+								resourceNode.size = resSize;
 								resourceNode.inode = upsert.resource.getInode();
 								resourceNode.tags = upsert.resource.getTags?.() ??
 									upsert.resource.tags ?? resourceNode.tags;

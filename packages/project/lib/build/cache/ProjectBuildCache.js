@@ -205,6 +205,7 @@ export default class ProjectBuildCache {
 			this.#changedDependencyResourcePaths.length === 0) {
 			return;
 		}
+
 		let sourceIndexChanged = false;
 		if (this.#changedProjectSourcePaths.length) {
 			// Update source index so we can use the signature later as part of the result stage signature
@@ -265,6 +266,7 @@ export default class ProjectBuildCache {
 		await Promise.all(tasksWithDepRequests.map(async (taskCache) => {
 			await taskCache.refreshDependencyIndices(dependencyReader);
 		}));
+
 		// Reset pending dependency changes since indices are fresh now anyways
 		this.#changedDependencyResourcePaths = [];
 	}
@@ -383,6 +385,7 @@ export default class ProjectBuildCache {
 				}
 			}
 		}
+
 		return Array.from(writtenResourcePaths);
 	}
 
@@ -395,15 +398,17 @@ export default class ProjectBuildCache {
 		const projectSourceSignature = this.#sourceIndex.getSignature();
 
 		const taskDependencySignatures = [];
-		for (const taskCache of this.#taskCache.values()) {
-			taskDependencySignatures.push(taskCache.getDependencyIndexSignatures());
+		for (const [taskName, taskCache] of this.#taskCache) {
+			const depSigs = taskCache.getDependencyIndexSignatures();
+			taskDependencySignatures.push(depSigs);
 		}
 		const dependencySignaturesCombinations = cartesianProduct(taskDependencySignatures);
 
-		return dependencySignaturesCombinations.map((dependencySignatures) => {
+		const sigs = dependencySignaturesCombinations.map((dependencySignatures) => {
 			const combinedDepSignature = createDependencySignature(dependencySignatures);
 			return createStageSignature(projectSourceSignature, combinedDepSignature);
 		});
+		return sigs;
 	}
 
 	/**
@@ -414,11 +419,12 @@ export default class ProjectBuildCache {
 	#getResultStageSignature() {
 		const projectSourceSignature = this.#sourceIndex.getSignature();
 		const dependencySignatures = [];
-		for (const [, depSignature] of this.#currentStageSignatures.values()) {
+		for (const [taskName, [, depSignature]] of [...this.#currentStageSignatures.entries()]) {
 			dependencySignatures.push(depSignature);
 		}
 		const combinedDepSignature = createDependencySignature(dependencySignatures);
-		return createStageSignature(projectSourceSignature, combinedDepSignature);
+		const sig = createStageSignature(projectSourceSignature, combinedDepSignature);
+		return sig;
 	}
 
 	// ===== TASK MANAGEMENT =====

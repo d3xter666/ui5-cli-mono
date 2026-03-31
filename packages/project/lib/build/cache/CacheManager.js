@@ -115,7 +115,14 @@ export default class CacheManager {
 	 * @returns {Promise<object|null>} Parsed manifest object or null if not found
 	 */
 	async readBuildManifest(projectId, buildSignature) {
-		return this.#store.get("buildManifests", CacheManager.#key(projectId, buildSignature));
+		const t = BuildTimings.start("readBuildManifest");
+		try {
+			return this.#store.get("buildManifests", CacheManager.#key(projectId, buildSignature));
+	
+		} finally {
+			BuildTimings.end("readBuildManifest", t);
+		}
+	
 	}
 
 	/**
@@ -128,7 +135,14 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeBuildManifest(projectId, buildSignature, manifest) {
-		await this.#store.put("buildManifests", CacheManager.#key(projectId, buildSignature), manifest);
+		const t = BuildTimings.start("writeBuildManifest");
+		try {
+			await this.#store.put("buildManifests", CacheManager.#key(projectId, buildSignature), manifest);
+	
+		} finally {
+			BuildTimings.end("writeBuildManifest", t);
+		}
+	
 	}
 
 	/**
@@ -141,7 +155,14 @@ export default class CacheManager {
 	 * @returns {Promise<object|null>} Parsed index cache object or null if not found
 	 */
 	async readIndexCache(projectId, buildSignature, kind) {
-		return this.#store.get("indexCache", CacheManager.#key(projectId, buildSignature, kind));
+		const t = BuildTimings.start("readIndexCache");
+		try {
+			return this.#store.get("indexCache", CacheManager.#key(projectId, buildSignature, kind));
+	
+		} finally {
+			BuildTimings.end("readIndexCache", t);
+		}
+	
 	}
 
 	/**
@@ -155,7 +176,14 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeIndexCache(projectId, buildSignature, kind, index) {
-		await this.#store.put("indexCache", CacheManager.#key(projectId, buildSignature, kind), index);
+		const t = BuildTimings.start("writeIndexCache");
+		try {
+			await this.#store.put("indexCache", CacheManager.#key(projectId, buildSignature, kind), index);
+	
+		} finally {
+			BuildTimings.end("writeIndexCache", t);
+		}
+	
 	}
 
 	/**
@@ -169,8 +197,15 @@ export default class CacheManager {
 	 * @returns {Promise<object|null>} Parsed stage metadata or null if not found
 	 */
 	async readStageCache(projectId, buildSignature, stageId, stageSignature) {
-		return this.#store.get("stageMetadata",
-			CacheManager.#key(projectId, buildSignature, stageId, stageSignature));
+		const t = BuildTimings.start("readStageCache");
+		try {
+			return this.#store.get("stageMetadata",
+				CacheManager.#key(projectId, buildSignature, stageId, stageSignature));
+	
+		} finally {
+			BuildTimings.end("readStageCache", t);
+		}
+	
 	}
 
 	/**
@@ -185,8 +220,15 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeStageCache(projectId, buildSignature, stageId, stageSignature, metadata) {
-		await this.#store.put("stageMetadata",
-			CacheManager.#key(projectId, buildSignature, stageId, stageSignature), metadata);
+		const t = BuildTimings.start("writeStageCache");
+		try {
+			await this.#store.put("stageMetadata",
+				CacheManager.#key(projectId, buildSignature, stageId, stageSignature), metadata);
+	
+		} finally {
+			BuildTimings.end("writeStageCache", t);
+		}
+	
 	}
 
 	/**
@@ -200,8 +242,15 @@ export default class CacheManager {
 	 * @returns {Promise<object|null>} Parsed task metadata or null if not found
 	 */
 	async readTaskMetadata(projectId, buildSignature, taskName, type) {
-		return this.#store.get("taskMetadata",
-			CacheManager.#key(projectId, buildSignature, taskName, type));
+		const t = BuildTimings.start("readTaskMetadata");
+		try {
+			return this.#store.get("taskMetadata",
+				CacheManager.#key(projectId, buildSignature, taskName, type));
+	
+		} finally {
+			BuildTimings.end("readTaskMetadata", t);
+		}
+	
 	}
 
 	/**
@@ -216,8 +265,15 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeTaskMetadata(projectId, buildSignature, taskName, type, metadata) {
-		await this.#store.put("taskMetadata",
-			CacheManager.#key(projectId, buildSignature, taskName, type), metadata);
+		const t = BuildTimings.start("writeTaskMetadata");
+		try {
+			await this.#store.put("taskMetadata",
+				CacheManager.#key(projectId, buildSignature, taskName, type), metadata);
+	
+		} finally {
+			BuildTimings.end("writeTaskMetadata", t);
+		}
+	
 	}
 
 	/**
@@ -230,8 +286,15 @@ export default class CacheManager {
 	 * @returns {Promise<object|null>} Parsed result metadata or null if not found
 	 */
 	async readResultMetadata(projectId, buildSignature, stageSignature) {
-		return this.#store.get("resultMetadata",
-			CacheManager.#key(projectId, buildSignature, stageSignature));
+		const t = BuildTimings.start("readResultMetadata");
+		try {
+			return this.#store.get("resultMetadata",
+				CacheManager.#key(projectId, buildSignature, stageSignature));
+	
+		} finally {
+			BuildTimings.end("readResultMetadata", t);
+		}
+	
 	}
 
 	/**
@@ -245,8 +308,15 @@ export default class CacheManager {
 	 * @returns {Promise<void>}
 	 */
 	async writeResultMetadata(projectId, buildSignature, stageSignature, metadata) {
-		await this.#store.put("resultMetadata",
-			CacheManager.#key(projectId, buildSignature, stageSignature), metadata);
+		const t = BuildTimings.start("writeResultMetadata");
+		try {
+			await this.#store.put("resultMetadata",
+				CacheManager.#key(projectId, buildSignature, stageSignature), metadata);
+	
+		} finally {
+			BuildTimings.end("writeResultMetadata", t);
+		}
+	
 	}
 
 	/**
@@ -266,19 +336,22 @@ export default class CacheManager {
 	 * @throws {Error} If integrity is not provided
 	 */
 	async getResourcePathForStage(buildSignature, stageId, stageSignature, resourcePath, integrity) {
-		if (!integrity) {
-			throw new Error("Integrity hash must be provided to read from cache");
-		}
 		const t = BuildTimings.start("getResourcePathForStage");
 		try {
+			if (!integrity) {
+				throw new Error("Integrity hash must be provided to read from cache");
+			}
+			// const cacheKey = this.#createKeyForStage(buildSignature, stageId, stageSignature, resourcePath, integrity);
 			const result = await cacache.get.info(this.#casDir, integrity);
 			if (!result) {
 				return null;
 			}
 			return result.path;
+	
 		} finally {
 			BuildTimings.end("getResourcePathForStage", t);
 		}
+	
 	}
 
 	/**
@@ -315,8 +388,10 @@ export default class CacheManager {
 					CACACHE_OPTIONS
 				);
 			}
+	
 		} finally {
 			BuildTimings.end("writeStageResource", t);
 		}
+	
 	}
 }

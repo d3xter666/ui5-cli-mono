@@ -90,6 +90,7 @@ export default class MetadataStore {
 				project_id      TEXT NOT NULL,
 				build_signature TEXT NOT NULL,
 				kind            TEXT NOT NULL,
+				ordinal         INTEGER NOT NULL,
 				task_name       TEXT NOT NULL,
 				supports_differential INTEGER NOT NULL,
 				PRIMARY KEY (project_id, build_signature, kind, task_name),
@@ -134,6 +135,7 @@ export default class MetadataStore {
 				project_id      TEXT NOT NULL,
 				build_signature TEXT NOT NULL,
 				stage_signature TEXT NOT NULL,
+				ordinal         INTEGER NOT NULL,
 				stage_name      TEXT NOT NULL,
 				sig_chain       TEXT NOT NULL,
 				PRIMARY KEY (project_id, build_signature, stage_signature, stage_name),
@@ -290,11 +292,11 @@ export default class MetadataStore {
 			),
 			getIndexCacheTasks: db.prepare(
 				`SELECT task_name, supports_differential FROM index_cache_tasks
-				 WHERE project_id = ? AND build_signature = ? AND kind = ?`
+				 WHERE project_id = ? AND build_signature = ? AND kind = ? ORDER BY ordinal`
 			),
 			putIndexCacheTask: db.prepare(
 				`INSERT OR REPLACE INTO index_cache_tasks
-				 (project_id, build_signature, kind, task_name, supports_differential) VALUES (?,?,?,?,?)`
+				 (project_id, build_signature, kind, ordinal, task_name, supports_differential) VALUES (?,?,?,?,?,?)`
 			),
 			delIndexCacheTasks: db.prepare(
 				`DELETE FROM index_cache_tasks WHERE project_id = ? AND build_signature = ? AND kind = ?`
@@ -335,11 +337,11 @@ export default class MetadataStore {
 			),
 			getResultStageSigs: db.prepare(
 				`SELECT stage_name, sig_chain FROM result_stage_sigs
-				 WHERE project_id = ? AND build_signature = ? AND stage_signature = ?`
+				 WHERE project_id = ? AND build_signature = ? AND stage_signature = ? ORDER BY ordinal`
 			),
 			putResultStageSig: db.prepare(
 				`INSERT OR REPLACE INTO result_stage_sigs
-				 (project_id, build_signature, stage_signature, stage_name, sig_chain) VALUES (?,?,?,?,?)`
+				 (project_id, build_signature, stage_signature, ordinal, stage_name, sig_chain) VALUES (?,?,?,?,?,?)`
 			),
 			delResultStageSigs: db.prepare(
 				`DELETE FROM result_stage_sigs WHERE project_id = ? AND build_signature = ? AND stage_signature = ?`
@@ -590,9 +592,11 @@ export default class MetadataStore {
 			// Tasks
 			this.#stmts.delIndexCacheTasks.run(projectId, buildSignature, kind);
 			if (data.tasks) {
+				let ordinal = 0;
 				for (const [taskName, supportsDiff] of data.tasks) {
 					this.#stmts.putIndexCacheTask.run(
-						projectId, buildSignature, kind, taskName, supportsDiff);
+						projectId, buildSignature, kind, ordinal, taskName, supportsDiff);
+					ordinal++;
 				}
 			}
 
@@ -628,9 +632,11 @@ export default class MetadataStore {
 
 			this.#stmts.delResultStageSigs.run(projectId, buildSignature, stageSignature);
 			if (data.stageSignatures) {
+				let ordinal = 0;
 				for (const [name, chain] of Object.entries(data.stageSignatures)) {
 					this.#stmts.putResultStageSig.run(
-						projectId, buildSignature, stageSignature, name, chain);
+						projectId, buildSignature, stageSignature, ordinal, name, chain);
+					ordinal++;
 				}
 			}
 		})();

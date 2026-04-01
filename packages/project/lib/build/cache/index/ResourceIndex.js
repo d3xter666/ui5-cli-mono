@@ -297,4 +297,144 @@ export default class ResourceIndex {
 			indexTree: this.#tree.toCacheObject(),
 		};
 	}
+
+	// --- Incremental Persistence Methods ---
+
+	/**
+	 * Check if there are dirty nodes that need to be persisted.
+	 *
+	 * @returns {boolean}
+	 */
+	hasDirtyNodes() {
+		return this.#tree.hasDirtyNodes();
+	}
+
+	/**
+	 * Get the number of dirty paths.
+	 *
+	 * @returns {number}
+	 */
+	getDirtyCount() {
+		return this.#tree.getDirtyCount();
+	}
+
+	/**
+	 * Flush incremental changes to a CompactableStore.
+	 *
+	 * Only writes nodes that have been modified since the last flush.
+	 * This is much more efficient than writing the entire tree.
+	 *
+	 * @param {CompactableStore} store - The store to write to
+	 * @returns {Promise<number>} Number of nodes written
+	 */
+	async flushIncrementalChanges(store) {
+		const dirtyNodes = this.#tree.getDirtyNodes();
+		if (dirtyNodes.length === 0) {
+			return 0;
+		}
+
+		for (const {path, node, operation} of dirtyNodes) {
+			await store.put(`node:${path}`, {
+				path,
+				node,
+				operation,
+				timestamp: Date.now(),
+			});
+		}
+
+		// Also store the current root hash and timestamp for quick validation
+		await store.put("_meta", {
+			rootHash: this.#tree.getRootHash(),
+			indexTimestamp: this.#tree.getIndexTimestamp(),
+			nodeCount: this.#tree.getResourcePaths().length,
+		});
+
+		this.#tree.clearDirtyTracking();
+		return dirtyNodes.length;
+	}
+
+	/**
+	 * Write all tree nodes to incremental store.
+	 *
+	 * Used for bootstrapping the incremental cache on cold builds.
+	 * This writes the complete tree structure so future builds can
+	 * use incremental updates.
+	 *
+	 * @param {CompactableStore} store - The store to write to
+	 * @returns {Promise<number>} Number of nodes written
+	 */
+	async writeAllToIncrementalStore(store) {
+		const allNodes = this.#tree.getAllNodes();
+		let count = 0;
+
+		for (const {path, node} of allNodes) {
+			await store.put(`node:${path}`, {
+				path,
+				node,
+				operation: "upsert",
+				timestamp: Date.now(),
+			});
+			count++;
+		}
+
+		// Store metadata
+		await store.put("_meta", {
+			rootHash: this.#tree.getRootHash(),
+			indexTimestamp: this.#tree.getIndexTimestamp(),
+			nodeCount: count,
+		});
+
+		return count;
+	}
+
+	/**
+	 * Create a ResourceIndex from incremental cache store.
+	 *
+	 * Loads the base snapshot (if exists) and applies all log entries.
+	 *
+	 * @param {CompactableStore} store - The store to read from
+	 * @returns {Promise<ResourceIndex|null>} Restored index or null if no cache exists
+	 */
+	static async fromIncrementalCache(store) {
+		await store.open();
+
+		// Check if we have metadata
+		const meta = await store.get("_meta");
+		if (!meta) {
+			return null;
+		}
+
+		// Collect all node entries
+		const nodes = new Map();
+		for await (const {key, value} of store.entries()) {
+			if (key.startsWith("node:")) {
+				const path = key.slice(5); // Remove "node:" prefix
+				if (value.operation === "remove") {
+					nodes.delete(path);
+				} else {
+					nodes.set(path, value.node);
+				}
+			}
+		}
+
+		// Rebuild tree from nodes
+		// This is a simplified version - full implementation would need
+		// to reconstruct the tree structure properly
+		const resourceData = [];
+		for (const [path, node] of nodes) {
+			if (node && node.type === "resource") {
+				resourceData.push({
+					path,
+					integrity: node.integrity,
+					lastModified: node.lastModified,
+					size: node.size,
+					inode: node.inode,
+					tags: node.tags,
+				});
+			}
+		}
+
+		const tree = new HashTree(resourceData, {indexTimestamp: meta.indexTimestamp});
+		return new ResourceIndex(tree);
+	}
 }

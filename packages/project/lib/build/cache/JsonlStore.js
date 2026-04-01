@@ -19,7 +19,6 @@ const appendFile = promisify(fs.appendFile);
  * Duplicate keys are resolved by last-write-wins (later lines override earlier).
  */
 export default class JsonlStore {
-	#dir;
 	#maps = new Map();
 	#files = new Map();
 
@@ -39,7 +38,6 @@ export default class JsonlStore {
 	 */
 	static async open(cacheDir) {
 		const store = new JsonlStore();
-		store.#dir = cacheDir;
 		await mkdir(cacheDir, {recursive: true});
 
 		for (const category of JsonlStore.#CATEGORIES) {
@@ -65,6 +63,10 @@ export default class JsonlStore {
 
 	/**
 	 * Load a JSONL file into a Map. Last-write-wins for duplicate keys.
+	 *
+	 * @param {string} filePath Path to the JSONL file
+	 * @param {Map} map Map to load entries into
+	 * @returns {Promise<void>}
 	 */
 	async #loadFile(filePath, map) {
 		const fileStream = createReadStream(filePath, {encoding: "utf8"});

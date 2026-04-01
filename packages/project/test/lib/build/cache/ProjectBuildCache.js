@@ -55,6 +55,14 @@ function createMockProject(name = "test.project", id = "test-project-id") {
 
 // Helper to create mock CacheManager instances
 function createMockCacheManager() {
+	const mockStore = {
+		put: sinon.stub().resolves(),
+		get: sinon.stub().resolves(null),
+		flush: sinon.stub().resolves(),
+		close: sinon.stub().resolves(),
+		open: sinon.stub().resolves(),
+		entries: sinon.stub().returns({[Symbol.asyncIterator]: async function* () {}}),
+	};
 	return {
 		readIndexCache: sinon.stub().resolves(null),
 		writeIndexCache: sinon.stub().resolves(),
@@ -65,7 +73,12 @@ function createMockCacheManager() {
 		readTaskMetadata: sinon.stub().resolves(null),
 		writeTaskMetadata: sinon.stub().resolves(),
 		writeStageResource: sinon.stub().resolves(),
-		getResourcePathForStage: sinon.stub().resolves("/fake/cache/path")
+		getResourcePathForStage: sinon.stub().resolves("/fake/cache/path"),
+		getIndexStore: sinon.stub().resolves(mockStore),
+		getTaskStore: sinon.stub().resolves(mockStore),
+		flushIncrementalStores: sinon.stub().resolves(),
+		closeIncrementalStores: sinon.stub().resolves(),
+		hasIncrementalIndex: sinon.stub().resolves(false),
 	};
 }
 

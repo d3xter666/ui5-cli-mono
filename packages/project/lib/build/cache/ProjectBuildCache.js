@@ -1105,10 +1105,36 @@ export default class ProjectBuildCache {
 	 */
 	async #initSourceIndex() {
 		const sourceReader = this.#project.getSourceReader();
-		const [resources, indexCache] = await Promise.all([
-			await sourceReader.byGlob("/**/*"),
-			await this.#cacheManager.readIndexCache(this.#project.getId(), this.#buildSignature, "source"),
-		]);
+		const resources = await sourceReader.byGlob("/**/*");
+
+		// Try to load from traditional cache first
+		const indexCache = await this.#cacheManager.readIndexCache(
+			this.#project.getId(), this.#buildSignature, "source"
+		);
+
+		// If no traditional cache, try incremental store
+		if (!indexCache) {
+			const incrementalIndex = await this.#tryLoadIncrementalIndex(resources);
+			if (incrementalIndex) {
+				// Loaded from incremental store
+				this.#sourceIndex = incrementalIndex.resourceIndex;
+				this.#writtenResultResourcePaths = incrementalIndex.changedPaths;
+				this.#combinedIndexState = INDEX_STATES.RESTORING_DEPENDENCY_INDICES;
+
+				// Load task caches
+				await this.#loadTaskCaches(incrementalIndex.tasks);
+
+				if (!incrementalIndex.changedPaths.length) {
+					this.#cachedSourceSignature = incrementalIndex.resourceIndex.getSignature();
+				}
+
+				log.verbose(
+					`Initialized source index from incremental cache for project ${this.#project.getName()} ` +
+					`with signature ${this.#sourceIndex.getSignature()}`);
+				return;
+			}
+		}
+
 		if (indexCache) {
 			log.verbose(`Using cached resource index for project ${this.#project.getName()}`);
 			// Create and diff resource index
@@ -1116,28 +1142,7 @@ export default class ProjectBuildCache {
 				await ResourceIndex.fromCacheWithDelta(indexCache, resources, Date.now());
 
 			// Import task caches
-			const buildTaskCaches = await Promise.all(
-				indexCache.tasks.map(async ([taskName, supportsDifferentialBuilds]) => {
-					const projectRequests = await this.#cacheManager.readTaskMetadata(
-						this.#project.getId(), this.#buildSignature, taskName, "project");
-					if (!projectRequests) {
-						throw new Error(`Failed to load project request cache for task ` +
-							`${taskName} in project ${this.#project.getName()}`);
-					}
-					const dependencyRequests = await this.#cacheManager.readTaskMetadata(
-						this.#project.getId(), this.#buildSignature, taskName, "dependencies");
-					if (!dependencyRequests) {
-						throw new Error(`Failed to load dependency request cache for task ` +
-							`${taskName} in project ${this.#project.getName()}`);
-					}
-					return BuildTaskCache.fromCache(this.#project.getName(), taskName, !!supportsDifferentialBuilds,
-						projectRequests, dependencyRequests);
-				})
-			);
-			// Ensure taskCache is filled in the order of task execution
-			for (const buildTaskCache of buildTaskCaches) {
-				this.#taskCache.set(buildTaskCache.getTaskName(), buildTaskCache);
-			}
+			await this.#loadTaskCaches(indexCache.tasks);
 
 			if (!changedPaths.length) {
 				// Source index is up-to-date with no changes
@@ -1156,6 +1161,89 @@ export default class ProjectBuildCache {
 		log.verbose(
 			`Initialized source index for project ${this.#project.getName()} ` +
 			`with signature ${this.#sourceIndex.getSignature()}`);
+	}
+
+	/**
+	 * Try to load source index from incremental cache store.
+	 *
+	 * @param {Array<@ui5/fs/Resource>} resources Current resources to compare against
+	 * @returns {Promise<{resourceIndex: ResourceIndex, changedPaths: string[], tasks: Array}|null>}
+	 */
+	async #tryLoadIncrementalIndex(resources) {
+		try {
+			const store = await this.#cacheManager.getIndexStore(
+				this.#project.getId(), this.#buildSignature, "source"
+			);
+
+			// Check if store has metadata
+			const meta = await store.get("_meta");
+			if (!meta) {
+				return null;
+			}
+
+			// Load tasks metadata
+			const tasks = await store.get("_tasks");
+			if (!tasks) {
+				return null;
+			}
+
+			log.verbose(`Loading incremental index cache for project ${this.#project.getName()}`);
+
+			// Load the resource index from incremental store
+			const resourceIndex = await ResourceIndex.fromIncrementalCache(store);
+			if (!resourceIndex) {
+				return null;
+			}
+
+			// Now apply delta with current resources
+			const currentResourcePaths = new Set(resources.map((r) => r.getOriginalPath()));
+			const cachedPaths = resourceIndex.getResourcePaths();
+
+			// Find removed resources
+			const removedPaths = cachedPaths.filter((p) => !currentResourcePaths.has(p));
+			const {removed} = await resourceIndex.removeResources(removedPaths);
+
+			// Upsert current resources (will only update changed ones)
+			const {added, updated} = await resourceIndex.upsertResources(resources, Date.now());
+
+			const changedPaths = [...added, ...updated, ...removed];
+
+			return {resourceIndex, changedPaths, tasks};
+		} catch (err) {
+			log.verbose(`Failed to load incremental index cache: ${err.message}`);
+			return null;
+		}
+	}
+
+	/**
+	 * Load task caches from metadata.
+	 *
+	 * @param {Array<[string, number]>} tasks Array of [taskName, supportsDifferentialBuilds]
+	 * @returns {Promise<void>}
+	 */
+	async #loadTaskCaches(tasks) {
+		const buildTaskCaches = await Promise.all(
+			tasks.map(async ([taskName, supportsDifferentialBuilds]) => {
+				const projectRequests = await this.#cacheManager.readTaskMetadata(
+					this.#project.getId(), this.#buildSignature, taskName, "project");
+				if (!projectRequests) {
+					throw new Error(`Failed to load project request cache for task ` +
+						`${taskName} in project ${this.#project.getName()}`);
+				}
+				const dependencyRequests = await this.#cacheManager.readTaskMetadata(
+					this.#project.getId(), this.#buildSignature, taskName, "dependencies");
+				if (!dependencyRequests) {
+					throw new Error(`Failed to load dependency request cache for task ` +
+						`${taskName} in project ${this.#project.getName()}`);
+				}
+				return BuildTaskCache.fromCache(this.#project.getName(), taskName, !!supportsDifferentialBuilds,
+					projectRequests, dependencyRequests);
+			})
+		);
+		// Ensure taskCache is filled in the order of task execution
+		for (const buildTaskCache of buildTaskCaches) {
+			this.#taskCache.set(buildTaskCache.getTaskName(), buildTaskCache);
+		}
 	}
 
 	/**
@@ -1355,6 +1443,9 @@ export default class ProjectBuildCache {
 	/**
 	 * Writes the source index cache to persistent storage
 	 *
+	 * Uses incremental writes when possible (dirty nodes from cache delta),
+	 * otherwise falls back to full index write (cold build).
+	 *
 	 * @returns {Promise<void>}
 	 */
 	async #writeSourceIndex() {
@@ -1362,17 +1453,62 @@ export default class ProjectBuildCache {
 			// No changes to already cached result index
 			return;
 		}
-		log.verbose(`Storing resource index cache for project ${this.#project.getName()} ` +
-			`with build signature ${this.#buildSignature}`);
-		const sourceIndexObject = this.#sourceIndex.toCacheObject();
+
 		const tasks = [];
 		for (const [taskName, taskCache] of this.#taskCache) {
 			tasks.push([taskName, taskCache.getSupportsDifferentialBuilds() ? 1 : 0]);
 		}
-		await this.#cacheManager.writeIndexCache(this.#project.getId(), this.#buildSignature, "source", {
-			...sourceIndexObject,
-			tasks,
-		});
+
+		// Check if we can use incremental writes (index was loaded from cache and has changes)
+		if (this.#sourceIndex.hasDirtyNodes()) {
+			log.verbose(`Storing incremental index updates for project ${this.#project.getName()} ` +
+				`(${this.#sourceIndex.getDirtyCount()} dirty nodes)`);
+
+			const store = await this.#cacheManager.getIndexStore(
+				this.#project.getId(), this.#buildSignature, "source"
+			);
+
+			// Store metadata alongside the index
+			await store.put("_meta", {
+				signature: this.#sourceIndex.getSignature(),
+				createdAt: Date.now(),
+			});
+			await store.put("_tasks", tasks);
+
+			// Flush only the dirty nodes
+			const nodeCount = await this.#sourceIndex.flushIncrementalChanges(store);
+			await store.flush();
+
+			log.verbose(`Wrote ${nodeCount} incremental index nodes for project ${this.#project.getName()}`);
+		} else {
+			// Cold build - write full index
+			// First, try to bootstrap incremental store for future builds
+			const store = await this.#cacheManager.getIndexStore(
+				this.#project.getId(), this.#buildSignature, "source"
+			);
+
+			log.verbose(`Bootstrapping incremental index cache for project ${this.#project.getName()} ` +
+				`with build signature ${this.#buildSignature}`);
+
+			// Store metadata
+			await store.put("_meta", {
+				signature: this.#sourceIndex.getSignature(),
+				createdAt: Date.now(),
+			});
+			await store.put("_tasks", tasks);
+
+			// Write all nodes to incremental store
+			await this.#sourceIndex.writeAllToIncrementalStore(store);
+			await store.flush();
+
+			// Also write traditional cache for backwards compatibility / fallback
+			log.verbose(`Also storing full resource index cache for project ${this.#project.getName()}`);
+			const sourceIndexObject = this.#sourceIndex.toCacheObject();
+			await this.#cacheManager.writeIndexCache(this.#project.getId(), this.#buildSignature, "source", {
+				...sourceIndexObject,
+				tasks,
+			});
+		}
 	}
 
 	/**

@@ -45,6 +45,8 @@ export function tagsEqual(a, b) {
  */
 export default class HashTree {
 	#indexTimestamp;
+	#dirtyPaths;
+
 	/**
 	 * Create a new HashTree
 	 *
@@ -57,6 +59,7 @@ export default class HashTree {
 	constructor(resources = null, options = {}) {
 		this.root = options._root || new TreeNode("", "directory");
 		this.#indexTimestamp = options.indexTimestamp;
+		this.#dirtyPaths = new Set();
 
 		if (resources && !options._root) {
 			this._buildTree(resources);
@@ -372,23 +375,16 @@ export default class HashTree {
 				continue;
 			}
 
-			// Replicate matchResourceMetadataStrict's fast path (sync, no I/O):
-			// If lastModified matches and is not at risk of race condition, content is unchanged.
-			const currentLastModified = resource.getLastModified();
-			if (currentLastModified === existingNode.lastModified &&
-				this.#indexTimestamp && currentLastModified !== this.#indexTimestamp) {
-				// Content definitely unchanged — check tags
-				if (tagsEqual(existingNode.tags, resource.getTags())) {
-					unchanged.push(resourcePath);
-				} else {
-					// Tag-only change — update tags without I/O
-					existingNode.tags = resource.getTags();
-					this._computeHash(existingNode);
-					updated.push(resourcePath);
-					const parts = resourcePath.split(path.sep).filter((p) => p.length > 0);
-					for (let i = 0; i < parts.length; i++) {
-						affectedPaths.add(parts.slice(0, i).join(path.sep));
-					}
+				const parts = resourcePath.split(path.sep).filter((p) => p.length > 0);
+				const resourceNode = this._findNode(resourcePath);
+				this._computeHash(resourceNode);
+
+				added.push(resourcePath);
+				this.#dirtyPaths.add(resourcePath);
+
+				// Mark ancestors for recomputation
+				for (let i = 0; i < parts.length; i++) {
+					affectedPaths.add(parts.slice(0, i).join(path.sep));
 				}
 				continue;
 			}
@@ -452,47 +448,9 @@ export default class HashTree {
 				};
 			}));
 
-			// Phase 3: Apply resolved results to the tree
-			for (const resolved of preResolved) {
-				if (resolved.isUnchanged) {
-					if (tagsEqual(resolved.existingNode.tags, resolved.tags)) {
-						unchanged.push(resolved.resourcePath);
-					} else {
-						resolved.existingNode.tags = resolved.tags;
-						this._computeHash(resolved.existingNode);
-						updated.push(resolved.resourcePath);
-						const parts = resolved.resourcePath.split(path.sep).filter((p) => p.length > 0);
-						for (let i = 0; i < parts.length; i++) {
-							affectedPaths.add(parts.slice(0, i).join(path.sep));
-						}
-					}
-					continue;
-				}
-
-				const parts = resolved.resourcePath.split(path.sep).filter((p) => p.length > 0);
-
-				if (resolved.isNew) {
-					this._insertResource(resolved.resourcePath, {
-						integrity: resolved.integrity,
-						lastModified: resolved.lastModified,
-						size: resolved.size,
-						inode: resolved.inode,
-						tags: resolved.tags
-					});
-
-					const resourceNode = this._findNode(resolved.resourcePath);
-					this._computeHash(resourceNode);
-					added.push(resolved.resourcePath);
-				} else {
-					resolved.existingNode.integrity = resolved.integrity;
-					resolved.existingNode.lastModified = resolved.lastModified;
-					resolved.existingNode.size = resolved.size;
-					resolved.existingNode.inode = resolved.inode;
-					resolved.existingNode.tags = resolved.tags;
-
-					this._computeHash(resolved.existingNode);
-					updated.push(resolved.resourcePath);
-				}
+				this._computeHash(existingNode);
+				updated.push(resourcePath);
+				this.#dirtyPaths.add(resourcePath);
 
 				for (let i = 0; i < parts.length; i++) {
 					affectedPaths.add(parts.slice(0, i).join(path.sep));
@@ -569,6 +527,7 @@ export default class HashTree {
 
 			if (wasRemoved) {
 				removed.push(resourcePath);
+				this.#dirtyPaths.add(resourcePath);
 
 				// Clean up empty parent directories bottom-up
 				for (let i = parts.length - 1; i > 0; i--) {
@@ -831,5 +790,107 @@ export default class HashTree {
 
 		traverse(this.root, "/");
 		return paths.sort();
+	}
+
+	// --- Dirty Tracking for Incremental Cache ---
+
+	/**
+	 * Check if there are dirty (modified) nodes that need to be persisted.
+	 *
+	 * @returns {boolean}
+	 */
+	hasDirtyNodes() {
+		return this.#dirtyPaths.size > 0;
+	}
+
+	/**
+	 * Get the number of dirty paths.
+	 *
+	 * @returns {number}
+	 */
+	getDirtyCount() {
+		return this.#dirtyPaths.size;
+	}
+
+	/**
+	 * Get all dirty (modified) nodes for incremental persistence.
+	 *
+	 * Returns an array of objects containing the path and serialized node data.
+	 * This is used to write only changed nodes to the cache log.
+	 *
+	 * @returns {Array<{path: string, node: object, operation: string}>}
+	 */
+	getDirtyNodes() {
+		const nodes = [];
+
+		for (const resourcePath of this.#dirtyPaths) {
+			const node = this._findNode(resourcePath);
+			if (node) {
+				nodes.push({
+					path: resourcePath,
+					node: node.toJSON(),
+					operation: "upsert",
+				});
+			} else {
+				// Node was removed
+				nodes.push({
+					path: resourcePath,
+					node: null,
+					operation: "remove",
+				});
+			}
+		}
+
+		return nodes;
+	}
+
+	/**
+	 * Get all nodes in the tree for bootstrapping incremental cache.
+	 *
+	 * Returns an array of objects containing the path and serialized node data
+	 * for all resource nodes in the tree.
+	 *
+	 * @returns {Array<{path: string, node: object}>}
+	 */
+	getAllNodes() {
+		const nodes = [];
+		const resourcePaths = this.getResourcePaths();
+
+		for (const resourcePath of resourcePaths) {
+			const node = this._findNode(resourcePath);
+			if (node) {
+				nodes.push({
+					path: resourcePath,
+					node: node.toJSON(),
+				});
+			}
+		}
+
+		return nodes;
+	}
+
+	/**
+	 * Get dirty paths as an array.
+	 *
+	 * @returns {Array<string>}
+	 */
+	getDirtyPaths() {
+		return Array.from(this.#dirtyPaths);
+	}
+
+	/**
+	 * Clear dirty tracking after nodes have been persisted.
+	 */
+	clearDirtyTracking() {
+		this.#dirtyPaths.clear();
+	}
+
+	/**
+	 * Mark a specific path as dirty (for external modifications).
+	 *
+	 * @param {string} resourcePath
+	 */
+	markDirty(resourcePath) {
+		this.#dirtyPaths.add(resourcePath);
 	}
 }

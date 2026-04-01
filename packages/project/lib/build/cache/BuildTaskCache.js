@@ -291,4 +291,91 @@ export default class BuildTaskCache {
 	toCacheObjects() {
 		return [this.#projectRequestManager.toCacheObject(), this.#dependencyRequestManager.toCacheObject()];
 	}
+
+	// --- Incremental Persistence Methods ---
+
+	/**
+	 * Check if there are dirty nodes that need to be persisted incrementally.
+	 *
+	 * @returns {boolean}
+	 */
+	hasDirtyNodes() {
+		return this.#projectRequestManager.hasDirtyNodes() ||
+			this.#dependencyRequestManager.hasDirtyNodes();
+	}
+
+	/**
+	 * Get the total count of dirty nodes across both managers.
+	 *
+	 * @returns {number}
+	 */
+	getDirtyCount() {
+		return this.#projectRequestManager.getDirtyCount() +
+			this.#dependencyRequestManager.getDirtyCount();
+	}
+
+	/**
+	 * Flush dirty nodes to incremental stores.
+	 *
+	 * @param {CompactableStore} projectStore - Store for project request data
+	 * @param {CompactableStore} dependencyStore - Store for dependency request data
+	 * @returns {Promise<number>} Total number of nodes written
+	 */
+	async flushIncrementalChanges(projectStore, dependencyStore) {
+		const [projectCount, dependencyCount] = await Promise.all([
+			this.#projectRequestManager.flushIncrementalChanges(projectStore),
+			this.#dependencyRequestManager.flushIncrementalChanges(dependencyStore),
+		]);
+		return projectCount + dependencyCount;
+	}
+
+	/**
+	 * Clear dirty tracking for both managers.
+	 */
+	clearDirtyTracking() {
+		this.#projectRequestManager.clearDirtyTracking();
+		this.#dependencyRequestManager.clearDirtyTracking();
+	}
+
+	/**
+	 * Mark all nodes in both managers as dirty (for bootstrapping).
+	 */
+	markAllDirty() {
+		this.#projectRequestManager.markAllDirty();
+		this.#dependencyRequestManager.markAllDirty();
+	}
+
+	/**
+	 * Restore a BuildTaskCache from incremental cache stores.
+	 *
+	 * @param {string} projectName Name of the project
+	 * @param {string} taskName Name of the task
+	 * @param {boolean} supportsDifferentialBuilds Whether the task supports differential updates
+	 * @param {CompactableStore} projectStore - Store containing project request data
+	 * @param {CompactableStore} dependencyStore - Store containing dependency request data
+	 * @returns {Promise<BuildTaskCache|null>} Restored task cache or null if no cache exists
+	 */
+	static async fromIncrementalCache(
+		projectName, taskName, supportsDifferentialBuilds,
+		projectStore, dependencyStore
+	) {
+		const [projectRequestManager, dependencyRequestManager] = await Promise.all([
+			ResourceRequestManager.fromIncrementalCache(
+				projectName, taskName, supportsDifferentialBuilds, projectStore
+			),
+			ResourceRequestManager.fromIncrementalCache(
+				projectName, taskName, supportsDifferentialBuilds, dependencyStore
+			),
+		]);
+
+		// Both must be present, or we have no valid cache
+		if (!projectRequestManager || !dependencyRequestManager) {
+			return null;
+		}
+
+		return new BuildTaskCache(
+			projectName, taskName, supportsDifferentialBuilds,
+			projectRequestManager, dependencyRequestManager
+		);
+	}
 }

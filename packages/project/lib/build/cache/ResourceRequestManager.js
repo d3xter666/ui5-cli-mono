@@ -26,6 +26,9 @@ class ResourceRequestManager {
 	#useDifferentialUpdate;
 	#unusedAtLeastOnce;
 
+	// Incremental cache tracking
+	#dirtyNodeIds = new Set();
+
 	/**
 	 * Creates a new ResourceRequestManager instance
 	 *
@@ -280,9 +283,13 @@ class ResourceRequestManager {
 			}
 			if (removedResourcePaths.length) {
 				await resourceIndex.removeResources(removedResourcePaths);
+				// Mark updated node as dirty for incremental persistence
+				this.#dirtyNodeIds.add(requestSetId);
 			}
 			if (resourcesToUpdate.length) {
 				await resourceIndex.upsertResources(resourcesToUpdate);
+				// Mark updated node as dirty for incremental persistence
+				this.#dirtyNodeIds.add(requestSetId);
 			}
 		}
 		let hasChanges;
@@ -564,6 +571,9 @@ class ResourceRequestManager {
 			const metadata = {}; // Will populate with resourceIndex below
 			setId = this.#requestGraph.addRequestSet(requests, metadata);
 
+			// Mark new node as dirty for incremental persistence
+			this.#dirtyNodeIds.add(setId);
+
 			const requestSet = this.#requestGraph.getNode(setId);
 			const parentId = requestSet.getParentId();
 			if (parentId) {
@@ -720,6 +730,179 @@ class ResourceRequestManager {
 			deltaIndices,
 			unusedAtLeastOnce: this.#unusedAtLeastOnce,
 		};
+	}
+
+	// --- Incremental Persistence Methods ---
+
+	/**
+	 * Check if there are dirty nodes that need to be persisted incrementally.
+	 *
+	 * @returns {boolean}
+	 */
+	hasDirtyNodes() {
+		return this.#dirtyNodeIds.size > 0;
+	}
+
+	/**
+	 * Get the count of dirty nodes.
+	 *
+	 * @returns {number}
+	 */
+	getDirtyCount() {
+		return this.#dirtyNodeIds.size;
+	}
+
+	/**
+	 * Flush only dirty nodes to incremental store.
+	 *
+	 * This writes only the modified request sets and their indices,
+	 * which is more efficient than writing the entire graph.
+	 *
+	 * @param {CompactableStore} store - The store to write to
+	 * @returns {Promise<number>} Number of nodes written
+	 */
+	async flushIncrementalChanges(store) {
+		if (this.#dirtyNodeIds.size === 0 && !this.#hasNewOrModifiedCacheEntries) {
+			return 0;
+		}
+
+		let count = 0;
+
+		// Write metadata about the graph structure
+		await store.put("_meta", {
+			nextId: this.#requestGraph.toCacheObject().nextId,
+			unusedAtLeastOnce: this.#unusedAtLeastOnce,
+			timestamp: Date.now(),
+		});
+
+		// Write only dirty nodes
+		for (const nodeId of this.#dirtyNodeIds) {
+			const node = this.#requestGraph.getNode(nodeId);
+			if (!node) {
+				// Node was removed, write tombstone
+				await store.put(`node:${nodeId}`, {deleted: true});
+				count++;
+				continue;
+			}
+
+			const {resourceIndex} = this.#requestGraph.getMetadata(nodeId);
+			const parentId = node.getParentId();
+
+			const nodeData = {
+				id: nodeId,
+				parent: parentId,
+				addedRequests: Array.from(node.getAddedRequests()).map((r) => r.toKey()),
+			};
+
+			if (!parentId) {
+				// Root node - write full resource index
+				await store.put(`node:${nodeId}`, {
+					...nodeData,
+					resourceIndex: resourceIndex ? resourceIndex.toCacheObject() : null,
+				});
+			} else {
+				// Delta node - write added resource index
+				const {resourceIndex: parentResourceIndex} = this.#requestGraph.getMetadata(parentId);
+				const addedResourceIndex = parentResourceIndex && resourceIndex ?
+					resourceIndex.getAddedResourceIndex(parentResourceIndex) : null;
+				await store.put(`node:${nodeId}`, {
+					...nodeData,
+					addedResourceIndex,
+				});
+			}
+			count++;
+		}
+
+		this.#dirtyNodeIds.clear();
+		return count;
+	}
+
+	/**
+	 * Clear dirty tracking after nodes have been persisted.
+	 */
+	clearDirtyTracking() {
+		this.#dirtyNodeIds.clear();
+	}
+
+	/**
+	 * Mark all current nodes as dirty (for bootstrapping incremental store).
+	 */
+	markAllDirty() {
+		for (const nodeId of this.#requestGraph.getAllNodeIds()) {
+			this.#dirtyNodeIds.add(nodeId);
+		}
+	}
+
+	/**
+	 * Restore a ResourceRequestManager from incremental cache store.
+	 *
+	 * Loads all stored nodes and reconstructs the request graph and indices.
+	 *
+	 * @param {string} projectName Name of the project
+	 * @param {string} taskName Name of the task
+	 * @param {boolean} useDifferentialUpdate Whether to track differential updates
+	 * @param {CompactableStore} store - The store to read from
+	 * @returns {Promise<ResourceRequestManager|null>} Restored manager or null if no cache exists
+	 */
+	static async fromIncrementalCache(projectName, taskName, useDifferentialUpdate, store) {
+		await store.open();
+
+		// Check if we have metadata
+		const meta = await store.get("_meta");
+		if (!meta) {
+			return null;
+		}
+
+		// Collect all node entries
+		const nodes = new Map();
+		for await (const {key, value} of store.entries()) {
+			if (key.startsWith("node:")) {
+				const nodeId = parseInt(key.slice(5), 10);
+				if (!value.deleted) {
+					nodes.set(nodeId, value);
+				}
+			}
+		}
+
+		if (nodes.size === 0) {
+			return null;
+		}
+
+		// Reconstruct the graph and indices
+		const graphData = {
+			nodes: [],
+			nextId: meta.nextId,
+		};
+		const rootIndices = [];
+		const deltaIndices = [];
+
+		for (const [, nodeData] of nodes) {
+			graphData.nodes.push({
+				id: nodeData.id,
+				parent: nodeData.parent,
+				addedRequests: nodeData.addedRequests,
+			});
+
+			if (!nodeData.parent) {
+				rootIndices.push({
+					nodeId: nodeData.id,
+					resourceIndex: nodeData.resourceIndex,
+				});
+			} else if (nodeData.addedResourceIndex) {
+				deltaIndices.push({
+					nodeId: nodeData.id,
+					addedResourceIndex: nodeData.addedResourceIndex,
+				});
+			}
+		}
+
+		// Use existing fromCache to reconstruct
+		return ResourceRequestManager.fromCache(projectName, taskName, useDifferentialUpdate, {
+			requestSetGraph: graphData,
+			rootIndices,
+			deltaIndices,
+			unusedAtLeastOnce: meta.unusedAtLeastOnce,
+		});
 	}
 }
 

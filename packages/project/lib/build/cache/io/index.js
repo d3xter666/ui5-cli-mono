@@ -5,3 +5,4 @@
  */
 
 export {default as StreamingJsonStore} from "./StreamingJsonStore.js";
+export {default as JqJsonlStore} from "./JqJsonlStore.js";

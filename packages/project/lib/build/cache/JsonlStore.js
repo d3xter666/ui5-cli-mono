@@ -6,6 +6,8 @@ import {createInterface} from "node:readline";
 
 const mkdir = promisify(fs.mkdir);
 const appendFile = promisify(fs.appendFile);
+const writeFile = promisify(fs.writeFile);
+const rename = promisify(fs.rename);
 
 /**
  * JSONL-based metadata store for build cache.
@@ -14,13 +16,25 @@ const appendFile = promisify(fs.appendFile);
  * many individual JSON files. Each line is a JSON object with key-value
  * structure: {"k":"<key>","v":<data>}
  *
- * On open, loads all lines into in-memory Maps for O(1) lookups.
- * On write, appends a line to the JSONL file and updates the Map.
- * Duplicate keys are resolved by last-write-wins (later lines override earlier).
+ * Categories are lazy-loaded on first access — only the files actually
+ * needed are parsed, avoiding unnecessary startup cost for small builds.
+ *
+ * On write, appends a line to the JSONL file and updates the in-memory Map.
+ * Duplicate keys are avoided by comparing against existing values before
+ * appending. On close, categories with a high duplicate ratio are compacted
+ * by atomically rewriting the file.
  */
 export default class JsonlStore {
+	#dir;
 	#maps = new Map();
 	#files = new Map();
+	#loaded = new Set();
+	#loadPromises = new Map();
+	#lineCount = new Map();
+	#dirty = new Set();
+
+	// Compact when the file has 2× more lines than unique keys
+	static #COMPACTION_RATIO = 2.0;
 
 	static #CATEGORIES = [
 		"buildManifests",
@@ -28,72 +42,128 @@ export default class JsonlStore {
 		"stageMetadata",
 		"taskMetadata",
 		"resultMetadata",
+		"incremental",
 	];
 
 	/**
 	 * Open the JSONL store at the given cache directory.
+	 *
+	 * Only resolves file paths — categories are lazy-loaded on first access.
 	 *
 	 * @param {string} cacheDir Absolute path to the versioned cache directory
 	 * @returns {Promise<JsonlStore>}
 	 */
 	static async open(cacheDir) {
 		const store = new JsonlStore();
+		store.#dir = cacheDir;
 		await mkdir(cacheDir, {recursive: true});
 
 		for (const category of JsonlStore.#CATEGORIES) {
 			const filePath = path.join(cacheDir, `${category}.jsonl`);
 			store.#files.set(category, filePath);
-
-			const map = new Map();
-			store.#maps.set(category, map);
-
-			// Load existing data
-			try {
-				await store.#loadFile(filePath, map);
-			} catch (err) {
-				if (err.code !== "ENOENT") {
-					throw err;
-				}
-				// File doesn't exist yet — empty map is fine
-			}
+			store.#maps.set(category, new Map());
+			store.#lineCount.set(category, 0);
 		}
 
 		return store;
 	}
 
 	/**
-	 * Load a JSONL file into a Map. Last-write-wins for duplicate keys.
+	 * Ensure a category's JSONL file has been loaded into its Map.
+	 * Concurrent calls for the same category share a single load promise.
 	 *
-	 * @param {string} filePath Path to the JSONL file
-	 * @param {Map} map Map to load entries into
+	 * @param {string} category Category name
 	 * @returns {Promise<void>}
 	 */
-	async #loadFile(filePath, map) {
-		const fileStream = createReadStream(filePath, {encoding: "utf8"});
-		const rl = createInterface({input: fileStream, crlfDelay: Infinity});
-		for await (const line of rl) {
-			if (line.length === 0) continue;
-			const entry = JSON.parse(line);
-			map.set(entry.k, entry.v);
+	async #ensureLoaded(category) {
+		if (this.#loaded.has(category)) {
+			return;
+		}
+		if (this.#loadPromises.has(category)) {
+			return this.#loadPromises.get(category);
+		}
+		const promise = this.#loadCategory(category);
+		this.#loadPromises.set(category, promise);
+		try {
+			await promise;
+		} finally {
+			this.#loadPromises.delete(category);
 		}
 	}
 
 	/**
+	 * Load a single category's JSONL file into its Map.
+	 *
+	 * @param {string} category Category name
+	 * @returns {Promise<void>}
+	 */
+	async #loadCategory(category) {
+		const filePath = this.#files.get(category);
+		const map = this.#maps.get(category);
+		let lineCount = 0;
+		try {
+			const fileStream = createReadStream(filePath, {encoding: "utf8"});
+			const rl = createInterface({input: fileStream, crlfDelay: Infinity});
+			for await (const line of rl) {
+				if (line.length === 0) {
+					continue;
+				}
+				const entry = JSON.parse(line);
+				map.set(entry.k, entry.v);
+				lineCount++;
+			}
+		} catch (err) {
+			if (err.code !== "ENOENT") {
+				throw err;
+			}
+			// File doesn't exist yet — empty map is fine
+		}
+		this.#lineCount.set(category, lineCount);
+		this.#loaded.add(category);
+	}
+
+	/**
 	 * Get a value by category and key.
+	 * Lazy-loads the category's file on first access.
 	 *
 	 * @param {string} category Metadata category name
 	 * @param {string} key Lookup key
-	 * @returns {object|null} Stored value or null if not found
+	 * @returns {Promise<object|null>} Stored value or null if not found
 	 */
-	get(category, key) {
-		const map = this.#maps.get(category);
-		const value = map.get(key);
+	async get(category, key) {
+		await this.#ensureLoaded(category);
+		const value = this.#maps.get(category).get(key);
 		return value !== undefined ? value : null;
 	}
 
 	/**
+	 * Iterate all entries in a category, optionally filtered by key prefix.
+	 *
+	 * @param {string} category Metadata category name
+	 * @param {string} [prefix] If provided, only yield entries whose key starts with this prefix.
+	 *   The prefix is stripped from the yielded key.
+	 * @returns {AsyncGenerator<{key: string, value: object}>}
+	 */
+	async* entries(category, prefix) {
+		await this.#ensureLoaded(category);
+		const map = this.#maps.get(category);
+		if (prefix) {
+			for (const [key, value] of map) {
+				if (key.startsWith(prefix)) {
+					yield {key: key.slice(prefix.length), value};
+				}
+			}
+		} else {
+			for (const [key, value] of map) {
+				yield {key, value};
+			}
+		}
+	}
+
+	/**
 	 * Store a value by category and key.
-	 * Appends to the JSONL file and updates the in-memory Map.
+	 * Skips the append if the value is identical to the existing one.
+	 * Otherwise appends to the JSONL file and updates the in-memory Map.
 	 *
 	 * @param {string} category Metadata category name
 	 * @param {string} key Lookup key
@@ -101,15 +171,61 @@ export default class JsonlStore {
 	 * @returns {Promise<void>}
 	 */
 	async put(category, key, data) {
-		this.#maps.get(category).set(key, data);
+		await this.#ensureLoaded(category);
+		const map = this.#maps.get(category);
+
+		// Skip write if value is unchanged (compare serialised form)
+		const existing = map.get(key);
+		if (existing !== undefined) {
+			const newJson = JSON.stringify(data);
+			if (JSON.stringify(existing) === newJson) {
+				return;
+			}
+		}
+
+		map.set(key, data);
 		const line = JSON.stringify({k: key, v: data}) + "\n";
 		await appendFile(this.#files.get(category), line, "utf8");
+		this.#lineCount.set(category, this.#lineCount.get(category) + 1);
+		this.#dirty.add(category);
 	}
 
 	/**
-	 * Close the store (no-op for JSONL, writes are flushed immediately).
+	 * Close the store. Compacts categories that have grown beyond the
+	 * duplicate threshold.
+	 *
+	 * @returns {Promise<void>}
 	 */
 	async close() {
-		// All writes are append-based and flushed via appendFile
+		const compactions = [];
+		for (const category of this.#dirty) {
+			const lineCount = this.#lineCount.get(category);
+			const keyCount = this.#maps.get(category).size;
+			if (keyCount > 0 && lineCount / keyCount >= JsonlStore.#COMPACTION_RATIO) {
+				compactions.push(this.#compact(category));
+			}
+		}
+		await Promise.all(compactions);
+	}
+
+	/**
+	 * Rewrite a category's JSONL file with only unique keys.
+	 * Uses atomic write-to-temp + rename.
+	 *
+	 * @param {string} category Category name
+	 * @returns {Promise<void>}
+	 */
+	async #compact(category) {
+		const filePath = this.#files.get(category);
+		const tmpPath = filePath + ".tmp";
+		const map = this.#maps.get(category);
+
+		const lines = [];
+		for (const [key, value] of map) {
+			lines.push(JSON.stringify({k: key, v: value}));
+		}
+		await writeFile(tmpPath, lines.join("\n") + "\n", "utf8");
+		await rename(tmpPath, filePath);
+		this.#lineCount.set(category, map.size);
 	}
 }

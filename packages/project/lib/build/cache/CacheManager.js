@@ -5,7 +5,6 @@ import {gzip} from "node:zlib";
 import os from "node:os";
 import Configuration from "../../config/Configuration.js";
 import JsonlStore from "./JsonlStore.js";
-import {CompactableStore} from "./io/index.js";
 import {getLogger} from "@ui5/logger";
 import BuildTimings from "./BuildTimings.js";
 
@@ -19,9 +18,6 @@ const CACACHE_OPTIONS = {algorithms: ["sha256"]};
 
 // Cache version for compatibility management
 const CACHE_VERSION = "v0_4_j";
-
-// Directory name for incremental stores
-const INCREMENTAL_DIR = "incremental";
 
 /**
  * Manages persistence for the build cache using file-based storage and cacache
@@ -49,8 +45,6 @@ const INCREMENTAL_DIR = "incremental";
 export default class CacheManager {
 	#casDir;
 	#store;
-	#incrementalDir;
-	#incrementalStores = new Map();
 
 	/**
 	 * Creates a new CacheManager instance
@@ -61,12 +55,10 @@ export default class CacheManager {
 	 * @private
 	 * @param {string} casDir Directory for content-addressable storage
 	 * @param {JsonlStore} store JSONL store for metadata
-	 * @param {string} incrementalDir Directory for incremental stores
 	 */
-	constructor(casDir, store, incrementalDir) {
+	constructor(casDir, store) {
 		this.#casDir = casDir;
 		this.#store = store;
-		this.#incrementalDir = incrementalDir;
 	}
 
 	/**
@@ -100,9 +92,8 @@ export default class CacheManager {
 		if (!chacheManagerInstances.has(cacheDir)) {
 			const versionedDir = path.join(cacheDir, CACHE_VERSION);
 			const casDir = path.join(versionedDir, "cas");
-			const incrementalDir = path.join(versionedDir, INCREMENTAL_DIR);
 			const store = await JsonlStore.open(versionedDir);
-			chacheManagerInstances.set(cacheDir, new CacheManager(casDir, store, incrementalDir));
+			chacheManagerInstances.set(cacheDir, new CacheManager(casDir, store));
 		}
 		return chacheManagerInstances.get(cacheDir);
 	}
@@ -127,7 +118,7 @@ export default class CacheManager {
 	async readBuildManifest(projectId, buildSignature) {
 		const t = BuildTimings.start("readBuildManifest");
 		try {
-			return this.#store.get("buildManifests", CacheManager.#key(projectId, buildSignature));
+			return await this.#store.get("buildManifests", CacheManager.#key(projectId, buildSignature));
 		} finally {
 			BuildTimings.end("readBuildManifest", t);
 		}
@@ -163,7 +154,7 @@ export default class CacheManager {
 	async readIndexCache(projectId, buildSignature, kind) {
 		const t = BuildTimings.start("readIndexCache");
 		try {
-			return this.#store.get("indexCache", CacheManager.#key(projectId, buildSignature, kind));
+			return await this.#store.get("indexCache", CacheManager.#key(projectId, buildSignature, kind));
 		} finally {
 			BuildTimings.end("readIndexCache", t);
 		}
@@ -201,7 +192,7 @@ export default class CacheManager {
 	async readStageCache(projectId, buildSignature, stageId, stageSignature) {
 		const t = BuildTimings.start("readStageCache");
 		try {
-			return this.#store.get("stageMetadata",
+			return await this.#store.get("stageMetadata",
 				CacheManager.#key(projectId, buildSignature, stageId, stageSignature));
 		} finally {
 			BuildTimings.end("readStageCache", t);
@@ -242,7 +233,7 @@ export default class CacheManager {
 	async readTaskMetadata(projectId, buildSignature, taskName, type) {
 		const t = BuildTimings.start("readTaskMetadata");
 		try {
-			return this.#store.get("taskMetadata",
+			return await this.#store.get("taskMetadata",
 				CacheManager.#key(projectId, buildSignature, taskName, type));
 		} finally {
 			BuildTimings.end("readTaskMetadata", t);
@@ -282,7 +273,7 @@ export default class CacheManager {
 	async readResultMetadata(projectId, buildSignature, stageSignature) {
 		const t = BuildTimings.start("readResultMetadata");
 		try {
-			return this.#store.get("resultMetadata",
+			return await this.#store.get("resultMetadata",
 				CacheManager.#key(projectId, buildSignature, stageSignature));
 		} finally {
 			BuildTimings.end("readResultMetadata", t);
@@ -383,97 +374,59 @@ export default class CacheManager {
 	// --- Incremental Index Methods ---
 
 	/**
-	 * Get or create a CompactableStore for incremental index storage.
+	 * Get a view into the incremental store for index storage.
 	 *
-	 * The store allows appending deltas instead of rewriting the full index.
+	 * All incremental data is stored in the shared "incremental" JSONL category
+	 * with prefixed keys for isolation between projects/kinds.
 	 *
 	 * @param {string} projectId Project identifier
 	 * @param {string} buildSignature Build signature hash
 	 * @param {string} kind "source" or "result"
-	 * @returns {Promise<CompactableStore>}
+	 * @returns {Promise<StoreView>}
 	 */
 	async getIndexStore(projectId, buildSignature, kind) {
-		const storeKey = `index:${projectId}:${buildSignature}:${kind}`;
-
-		if (!this.#incrementalStores.has(storeKey)) {
-			const basePath = path.join(
-				this.#incrementalDir,
-				"index",
-				projectId.replace(/\//g, "_"),
-				buildSignature,
-				kind
-			);
-			const store = new CompactableStore(basePath);
-			await store.open();
-			this.#incrementalStores.set(storeKey, store);
-		}
-
-		return this.#incrementalStores.get(storeKey);
+		const prefix = `index\x00${projectId}\x00${buildSignature}\x00${kind}\x00`;
+		return new StoreView(this.#store, prefix);
 	}
 
 	/**
-	 * Get or create a CompactableStore for incremental task metadata storage.
+	 * Get a view into the incremental store for task metadata storage.
 	 *
 	 * @param {string} projectId Project identifier
 	 * @param {string} buildSignature Build signature hash
 	 * @param {string} taskName Task name
 	 * @param {string} type "project" or "dependency"
-	 * @returns {Promise<CompactableStore>}
+	 * @returns {Promise<StoreView>}
 	 */
 	async getTaskStore(projectId, buildSignature, taskName, type) {
-		const storeKey = `task:${projectId}:${buildSignature}:${taskName}:${type}`;
-
-		if (!this.#incrementalStores.has(storeKey)) {
-			const basePath = path.join(
-				this.#incrementalDir,
-				"task",
-				projectId.replace(/\//g, "_"),
-				buildSignature,
-				taskName,
-				type
-			);
-			const store = new CompactableStore(basePath);
-			await store.open();
-			this.#incrementalStores.set(storeKey, store);
-		}
-
-		return this.#incrementalStores.get(storeKey);
+		const prefix = `task\x00${projectId}\x00${buildSignature}\x00${taskName}\x00${type}\x00`;
+		return new StoreView(this.#store, prefix);
 	}
 
 	/**
-	 * Flush all open incremental stores.
+	 * Flush all incremental data.
 	 *
-	 * Should be called at the end of a build to ensure all data is persisted.
+	 * No-op because the JSONL store appends on every put().
 	 *
 	 * @returns {Promise<void>}
 	 */
 	async flushIncrementalStores() {
-		const t = BuildTimings.start("flushIncrementalStores");
-		try {
-			const flushPromises = [];
-			for (const store of this.#incrementalStores.values()) {
-				flushPromises.push(store.flush());
-			}
-			await Promise.all(flushPromises);
-		} finally {
-			BuildTimings.end("flushIncrementalStores", t);
-		}
+		// Data is flushed on every put() via appendFile
 	}
 
 	/**
-	 * Close all open incremental stores.
+	 * Close all incremental stores.
+	 *
+	 * No-op because the underlying JSONL store is shared and closed separately.
 	 *
 	 * @returns {Promise<void>}
 	 */
 	async closeIncrementalStores() {
-		for (const store of this.#incrementalStores.values()) {
-			await store.close();
-		}
-		this.#incrementalStores.clear();
+		// Incremental data lives in the shared JsonlStore
 	}
 
 	/**
-	 * Check if an incremental index store exists for the given parameters.
+	 * Check if incremental index data exists for the given parameters.
 	 *
 	 * @param {string} projectId Project identifier
 	 * @param {string} buildSignature Build signature hash
@@ -481,15 +434,77 @@ export default class CacheManager {
 	 * @returns {Promise<boolean>}
 	 */
 	async hasIncrementalIndex(projectId, buildSignature, kind) {
-		const basePath = path.join(
-			this.#incrementalDir,
-			"index",
-			projectId.replace(/\//g, "_"),
-			buildSignature,
-			kind
-		);
-		const store = new CompactableStore(basePath);
-		const exists = await store.has("_meta");
-		return exists;
+		const prefix = `index\x00${projectId}\x00${buildSignature}\x00${kind}\x00`;
+		const meta = await this.#store.get("incremental", prefix + "_meta");
+		return meta !== null;
+	}
+
+	/**
+	 * Close the JSONL store, triggering compaction of dirty categories.
+	 *
+	 * @returns {Promise<void>}
+	 */
+	async close() {
+		await this.#store.close();
+	}
+
+	/**
+	 * Close all CacheManager instances.
+	 *
+	 * @returns {Promise<void>}
+	 */
+	static async closeAll() {
+		const closePromises = [];
+		for (const instance of chacheManagerInstances.values()) {
+			closePromises.push(instance.close());
+		}
+		await Promise.all(closePromises);
+	}
+}
+
+/**
+ * Lightweight view into a JsonlStore's "incremental" category.
+ *
+ * Provides the same get/put/has/flush/open/entries interface that
+ * CompactableStore exposed, but delegates to the shared JSONL file
+ * with key isolation via a prefix.
+ *
+ * @class
+ */
+class StoreView {
+	#store;
+	#prefix;
+
+	constructor(store, prefix) {
+		this.#store = store;
+		this.#prefix = prefix;
+	}
+
+	async open() {
+		// No-op — underlying store is already open
+	}
+
+	async get(key) {
+		return await this.#store.get("incremental", this.#prefix + key);
+	}
+
+	async put(key, value) {
+		await this.#store.put("incremental", this.#prefix + key, value);
+	}
+
+	async has(key) {
+		return (await this.get(key)) !== null;
+	}
+
+	async flush() {
+		// No-op — data is appended immediately on put
+	}
+
+	async close() {
+		// No-op — shared store closed via CacheManager.close()
+	}
+
+	async* entries() {
+		yield* this.#store.entries("incremental", this.#prefix);
 	}
 }

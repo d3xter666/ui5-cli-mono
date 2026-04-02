@@ -1,12 +1,12 @@
 import path from "node:path";
 import fs from "graceful-fs";
 import {promisify} from "node:util";
-import {createReadStream} from "node:fs";
-import {createInterface} from "node:readline";
+import {createReadStream, createWriteStream} from "node:fs";
+import {pipeline} from "node:stream/promises";
+import {parseChunked, stringifyChunked} from "@discoveryjs/json-ext";
 
 const mkdir = promisify(fs.mkdir);
 const appendFile = promisify(fs.appendFile);
-const writeFile = promisify(fs.writeFile);
 const rename = promisify(fs.rename);
 
 /**
@@ -101,16 +101,13 @@ export default class JsonlStore {
 		const map = this.#maps.get(category);
 		let lineCount = 0;
 		try {
-			const fileStream = createReadStream(filePath, {encoding: "utf8"});
-			const rl = createInterface({input: fileStream, crlfDelay: Infinity});
-			for await (const line of rl) {
-				if (line.length === 0) {
-					continue;
-				}
-				const entry = JSON.parse(line);
-				map.set(entry.k, entry.v);
-				lineCount++;
-			}
+			await parseChunked(createReadStream(filePath), {
+				mode: "jsonl",
+				onRootValue(entry) {
+					map.set(entry.k, entry.v);
+					lineCount++;
+				},
+			});
 		} catch (err) {
 			if (err.code !== "ENOENT") {
 				throw err;
@@ -195,11 +192,11 @@ export default class JsonlStore {
 		const tmpPath = filePath + ".tmp";
 		const map = this.#maps.get(category);
 
-		const lines = [];
-		for (const [key, value] of map) {
-			lines.push(JSON.stringify({k: key, v: value}));
-		}
-		await writeFile(tmpPath, lines.join("\n") + "\n", "utf8");
+		const entries = Array.from(map, ([key, value]) => ({k: key, v: value}));
+		await pipeline(
+			stringifyChunked(entries, {mode: "jsonl"}),
+			createWriteStream(tmpPath)
+		);
 		await rename(tmpPath, filePath);
 		this.#lineCount.set(category, map.size);
 	}

@@ -117,7 +117,7 @@ export default class CacheManager {
 	async readBuildManifest(projectId, buildSignature) {
 		const t = BuildTimings.start("readBuildManifest");
 		try {
-			return this.#store.get("buildManifests", CacheManager.#key(projectId, buildSignature));
+			return await this.#store.get("buildManifests", CacheManager.#key(projectId, buildSignature));
 	
 		} finally {
 			BuildTimings.end("readBuildManifest", t);
@@ -157,7 +157,7 @@ export default class CacheManager {
 	async readIndexCache(projectId, buildSignature, kind) {
 		const t = BuildTimings.start("readIndexCache");
 		try {
-			return this.#store.get("indexCache", CacheManager.#key(projectId, buildSignature, kind));
+			return await this.#store.get("indexCache", CacheManager.#key(projectId, buildSignature, kind));
 	
 		} finally {
 			BuildTimings.end("readIndexCache", t);
@@ -199,7 +199,7 @@ export default class CacheManager {
 	async readStageCache(projectId, buildSignature, stageId, stageSignature) {
 		const t = BuildTimings.start("readStageCache");
 		try {
-			return this.#store.get("stageMetadata",
+			return await this.#store.get("stageMetadata",
 				CacheManager.#key(projectId, buildSignature, stageId, stageSignature));
 	
 		} finally {
@@ -244,7 +244,7 @@ export default class CacheManager {
 	async readTaskMetadata(projectId, buildSignature, taskName, type) {
 		const t = BuildTimings.start("readTaskMetadata");
 		try {
-			return this.#store.get("taskMetadata",
+			return await this.#store.get("taskMetadata",
 				CacheManager.#key(projectId, buildSignature, taskName, type));
 	
 		} finally {
@@ -288,7 +288,7 @@ export default class CacheManager {
 	async readResultMetadata(projectId, buildSignature, stageSignature) {
 		const t = BuildTimings.start("readResultMetadata");
 		try {
-			return this.#store.get("resultMetadata",
+			return await this.#store.get("resultMetadata",
 				CacheManager.#key(projectId, buildSignature, stageSignature));
 	
 		} finally {
@@ -393,5 +393,27 @@ export default class CacheManager {
 			BuildTimings.end("writeStageResource", t);
 		}
 	
+	}
+
+	/**
+	 * Close the metadata store, triggering compaction of dirty categories.
+	 *
+	 * @returns {Promise<void>}
+	 */
+	async close() {
+		await this.#store.close();
+	}
+
+	/**
+	 * Close all singleton CacheManager instances and compact JSONL stores.
+	 * Should be called before process exit.
+	 *
+	 * @public
+	 * @returns {Promise<void>}
+	 */
+	static async closeAll() {
+		const instances = Array.from(chacheManagerInstances.values());
+		chacheManagerInstances.clear();
+		await Promise.all(instances.map((instance) => instance.close()));
 	}
 }

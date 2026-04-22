@@ -1327,7 +1327,7 @@ export default class ProjectBuildCache {
 				inode: res.getInode(),
 				lastModified: res.getLastModified(),
 				size: await res.getSize(),
-				integrity: await res.getIntegrity(),
+				integrity: await res.getHash(),
 			};
 		}));
 		return resourceMetadata;

@@ -25,3 +25,4 @@ jobs:
       # Reusable engine: audits locked (npm ci) + latest (dev + prod) + latest (prod only).
       - name: Audit dependencies
         uses: ./.github/actions/dependency-audit
+        continue-on-error: true  # Allow summary to be visible even when vulnerabilities are found

@@ -66,6 +66,7 @@ npm install --no-audit --no-fund --ignore-scripts
 audit_scope "latest (dev + prod)" devprod
 audit_scope "latest (prod only)" prod --skip-dev
 
+echo "Generating comparison summary..."
 # --- Comparison summary ---------------------------------------------------------
 # Advisory ids the repo config allowlists, so the table matches audit-ci's effective verdict.
 allowlist="${work}/allowlist.txt"
@@ -132,14 +133,4 @@ rows="$(
 		"Advisories allowlisted in this repo's audit-ci config are excluded."
 } >> "${GITHUB_STEP_SUMMARY:-/dev/stdout}"
 
-# Hand the verdict to the action's gate step instead of failing here. A step that
-# writes $GITHUB_STEP_SUMMARY and then exits non-zero does NOT get its summary
-# rendered, so this step must finish successfully for the table to show; the
-# action's separate gate step fails the job when findings exist.
-if [ -n "${GITHUB_OUTPUT:-}" ]; then
-	echo "failed=${failed}" >> "${GITHUB_OUTPUT}"
-	exit 0
-fi
-
-# Local run (no gate step follows): fail directly so findings are still signalled.
 exit "${failed}"

@@ -47,4 +47,3 @@ jobs:
       # TODO: pin to a commit SHA once this action exists on the default branch.
       - name: Audit dependencies
         uses: d3xter666/ui5-cli-mono/.github/actions/dependency-audit@main
-        continue-on-error: true  # Allow summary to be visible even when vulnerabilities are found

@@ -4,6 +4,61 @@ This project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html
 
 A list of unreleased changes can be found [here](https://github.com/SAP/ui5-server/compare/v4.0.7...HEAD).
 
+## [5.0.0-alpha.14](https://github.com/d3xter666/ui5-cli-mono/compare/server-v5.0.0-alpha.13...server-v5.0.0-alpha.14) (2026-10-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **cli:** "ui5 serve --https" no longer generates or installs a self-signed certificate when none exists. Run "ui5 certificate generate" first, or pass --key and --cert.
+* The `--h2` option of `ui5 serve` has been removed. Use `--https` to serve the project over HTTPS. The `@ui5/server` `serve()` option `h2` and the returned `h2` property have been renamed to `https`. If you need HTTP/2 for local development, put a reverse proxy (e.g. nginx) in front of the server to terminate it.
+* The internal Express server has been upgraded from Express 4 to Express 5. Review your custom middleware against the Express 5 migration guide (https://expressjs.com/en/guide/migrating-5/) and adjust it if necessary.
+* Require Node.js ^22.22.2 || ^24.15.0 || >=26.0.0 ([#1522](https://github.com/d3xter666/ui5-cli-mono/issues/1522))
+* Remove --experimental-css-variables option ([#1484](https://github.com/d3xter666/ui5-cli-mono/issues/1484))
+* Remove testRunner middleware
+
+### Features
+
+* **cli:** Add "certificate generate" command ([#1560](https://github.com/d3xter666/ui5-cli-mono/issues/1560)) ([af98631](https://github.com/d3xter666/ui5-cli-mono/commit/af98631e105c89618196811b4ea74b909dac8e7d))
+* Remove --experimental-css-variables option ([#1484](https://github.com/d3xter666/ui5-cli-mono/issues/1484)) ([94b57a9](https://github.com/d3xter666/ui5-cli-mono/commit/94b57a93d869dc5286e07e79b9d1690916b55b49))
+* Remove testRunner middleware ([11406ee](https://github.com/d3xter666/ui5-cli-mono/commit/11406ee7ea9354cce380f23ea1e28b0c5837a9ff))
+* Replace HTTP/2 support with HTTPS ([#1532](https://github.com/d3xter666/ui5-cli-mono/issues/1532)) ([506dec4](https://github.com/d3xter666/ui5-cli-mono/commit/506dec48c04ed75ed4d78e036f380d5493f6dd77))
+* **server:** Add liveReload middleware ([9d9347e](https://github.com/d3xter666/ui5-cli-mono/commit/9d9347e80fa25cf9869eeb35ea5a76d837ff66fe))
+* **server:** Add serveMiddleware API for Node.js server integration ([93f52eb](https://github.com/d3xter666/ui5-cli-mono/commit/93f52ebb1a8ad70fadc88bc80fbc5ac3b9087ba9))
+* **server:** Integrate BuildServer into dev server ([997ba31](https://github.com/d3xter666/ui5-cli-mono/commit/997ba3132c3ea623ed4dfe5f27ca95051666f29c))
+
+
+### Bug Fixes
+
+* Bump from 5.0.0-alpha.0 to 5.0.0-alpha.1 ([#1236](https://github.com/d3xter666/ui5-cli-mono/issues/1236)) ([220452a](https://github.com/d3xter666/ui5-cli-mono/commit/220452a77f6062e24d4473f7eb4098e5d3700aed))
+* Fix gray code blocks in Markdown ([1cdd610](https://github.com/d3xter666/ui5-cli-mono/commit/1cdd61060bd592b5c5f573635444d5ba37a8dc98))
+* **server:** Clone custom middleware configuration before passing it ([98d9830](https://github.com/d3xter666/ui5-cli-mono/commit/98d98309e26a72de4afde577494309742a434273))
+* **server:** Explicitly bind to IPv4 loopback ([d913c56](https://github.com/d3xter666/ui5-cli-mono/commit/d913c56a173c62c3c450c2dde358b1081b57db02))
+* **server:** Generate library manifest from project source reader ([0c936f7](https://github.com/d3xter666/ui5-cli-mono/commit/0c936f7d933e945755e74596387f29e4ab9006b0))
+* **server:** Remove import of @ui5/project build cache enum ([5889980](https://github.com/d3xter666/ui5-cli-mono/commit/588998011e5cb609126a36ff43fc72962a50619a))
+* **server:** Sequence destroy() after native teardown ([88899b0](https://github.com/d3xter666/ui5-cli-mono/commit/88899b074cb2fccf29cccf6001c4a6f396a553cd))
+
+
+### Dependencies
+
+* Bump body-parser from 1.20.4 to 2.2.2 ([#1272](https://github.com/d3xter666/ui5-cli-mono/issues/1272)) ([8619d21](https://github.com/d3xter666/ui5-cli-mono/commit/8619d21f02f8a74975c572d6b9d967fa5495b2e1))
+* Bump body-parser from 2.2.2 to 2.3.0 ([#1422](https://github.com/d3xter666/ui5-cli-mono/issues/1422)) ([be31142](https://github.com/d3xter666/ui5-cli-mono/commit/be3114296ef215b5fa8cea712058de19b0a275e5))
+* Bump express from 4.22.2 to 5.2.1 ([87b2686](https://github.com/d3xter666/ui5-cli-mono/commit/87b26860b83bcb27f910c470d2628c71bb2dd4b6))
+* Bump mime-types from 2.1.35 to 3.0.2 ([356df87](https://github.com/d3xter666/ui5-cli-mono/commit/356df871173eca67c417c00161becf53d82ebc80))
+* Bump qs and express ([#1396](https://github.com/d3xter666/ui5-cli-mono/issues/1396)) ([a0e173b](https://github.com/d3xter666/ui5-cli-mono/commit/a0e173b2bf53d3888702ea50b4dde75295aa82d0))
+* Bump serve-index fork to 1.9.2 ([2995381](https://github.com/d3xter666/ui5-cli-mono/commit/29953811d978aeb16c79e8c767236db027d8c648))
+* Bump the npm group with 2 updates ([#1603](https://github.com/d3xter666/ui5-cli-mono/issues/1603)) ([2d693e8](https://github.com/d3xter666/ui5-cli-mono/commit/2d693e8690d67ac1aa934461f80d8493d87301e9))
+* Bump the npm group with 3 updates ([#1631](https://github.com/d3xter666/ui5-cli-mono/issues/1631)) ([9e5c985](https://github.com/d3xter666/ui5-cli-mono/commit/9e5c985cf2427669f4bff31fd3832876684a493c))
+* Bump the npm group with 7 updates ([77718d7](https://github.com/d3xter666/ui5-cli-mono/commit/77718d760db51a2ab248d0454df1eb3d64facc9a))
+* Require Node.js ^22.22.2 || ^24.15.0 || &gt;=26.0.0 ([#1522](https://github.com/d3xter666/ui5-cli-mono/issues/1522)) ([f02105e](https://github.com/d3xter666/ui5-cli-mono/commit/f02105e9a75a6c82526343dc47c4aaf9bccdc6ae))
+* Update npm dependencies ([0ac8ebb](https://github.com/d3xter666/ui5-cli-mono/commit/0ac8ebbb5ffe9fc6e4455244cf5da50e4c540c5c))
+* The following workspace dependencies were updated
+  * dependencies
+    * @ui5/builder bumped from ^5.0.0-alpha.13 to ^5.0.0-alpha.14
+    * @ui5/fs bumped from ^5.0.0-alpha.13 to ^5.0.0-alpha.14
+    * @ui5/logger bumped from ^5.0.0-alpha.13 to ^5.0.0-alpha.14
+  * devDependencies
+    * @ui5/project bumped from ^5.0.0-alpha.13 to ^5.0.0-alpha.14
+
 ## [5.0.0-alpha.13](https://github.com/UI5/cli/compare/server-v5.0.0-alpha.12...server-v5.0.0-alpha.13) (2026-10-01)
 
 

@@ -4,6 +4,35 @@ This project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html
 
 A list of unreleased changes can be found [here](https://github.com/SAP/ui5-logger/compare/v4.0.2...HEAD).
 
+## [5.0.0-alpha.14](https://github.com/d3xter666/ui5-cli-mono/compare/logger-v5.0.0-alpha.13...logger-v5.0.0-alpha.14) (2026-10-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* Require Node.js ^22.22.2 || ^24.15.0 || >=26.0.0 ([#1522](https://github.com/d3xter666/ui5-cli-mono/issues/1522))
+
+### Features
+
+* Add live status banner to ui5 serve ([#1439](https://github.com/d3xter666/ui5-cli-mono/issues/1439)) ([2a46c8b](https://github.com/d3xter666/ui5-cli-mono/commit/2a46c8b97f3613314cd61507417f97b079943bce))
+* **logger:** Add differential build logging support ([0c06880](https://github.com/d3xter666/ui5-cli-mono/commit/0c0688047e699330b1a98a5845dc04b25db3db6c))
+* **logger:** Add module filtering, task-skip event ([5a1b071](https://github.com/d3xter666/ui5-cli-mono/commit/5a1b07127ad91ba27deaface060235ddb16a9e21))
+* **logger:** Add written resource paths to task-end build-status event ([982ee59](https://github.com/d3xter666/ui5-cli-mono/commit/982ee5914bd694da9d8a91ae23d4e7d4264647d9))
+
+
+### Bug Fixes
+
+* Bump from 5.0.0-alpha.0 to 5.0.0-alpha.1 ([#1236](https://github.com/d3xter666/ui5-cli-mono/issues/1236)) ([220452a](https://github.com/d3xter666/ui5-cli-mono/commit/220452a77f6062e24d4473f7eb4098e5d3700aed))
+* Refine interactive serve logging and warning messaging ([#1483](https://github.com/d3xter666/ui5-cli-mono/issues/1483)) ([acd707b](https://github.com/d3xter666/ui5-cli-mono/commit/acd707b18ec7c8453b9210307574e837a19cca4d))
+* Show resolved framework version in serve console output ([3210e8b](https://github.com/d3xter666/ui5-cli-mono/commit/3210e8b4f1e212621b03afb6f0b888a32aa19f3e))
+
+
+### Dependencies
+
+* Bump chalk from 5.6.2 to 6.0.0 ([62a3e39](https://github.com/d3xter666/ui5-cli-mono/commit/62a3e3971ca3079b7cbfb6cfd4c28bd2e902e767))
+* Bump the npm group with 3 updates ([#1631](https://github.com/d3xter666/ui5-cli-mono/issues/1631)) ([9e5c985](https://github.com/d3xter666/ui5-cli-mono/commit/9e5c985cf2427669f4bff31fd3832876684a493c))
+* Require Node.js ^22.22.2 || ^24.15.0 || &gt;=26.0.0 ([#1522](https://github.com/d3xter666/ui5-cli-mono/issues/1522)) ([f02105e](https://github.com/d3xter666/ui5-cli-mono/commit/f02105e9a75a6c82526343dc47c4aaf9bccdc6ae))
+* Update npm dependencies ([0ac8ebb](https://github.com/d3xter666/ui5-cli-mono/commit/0ac8ebbb5ffe9fc6e4455244cf5da50e4c540c5c))
+
 ## [5.0.0-alpha.13](https://github.com/UI5/cli/compare/logger-v5.0.0-alpha.12...logger-v5.0.0-alpha.13) (2026-10-01)
 
 

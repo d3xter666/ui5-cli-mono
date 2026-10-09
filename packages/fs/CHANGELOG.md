@@ -4,6 +4,36 @@ This project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html
 
 A list of unreleased changes can be found [here](https://github.com/SAP/ui5-fs/compare/v4.0.2...HEAD).
 
+## [5.0.0-alpha.14](https://github.com/d3xter666/ui5-cli-mono/compare/fs-v5.0.0-alpha.13...fs-v5.0.0-alpha.14) (2026-10-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* Require Node.js ^22.22.2 || ^24.15.0 || >=26.0.0 ([#1522](https://github.com/d3xter666/ui5-cli-mono/issues/1522))
+
+### Features
+
+* **fs:** Enhance API for incremental builds ([df050e2](https://github.com/d3xter666/ui5-cli-mono/commit/df050e2c28ccfdadeda028057534d92e9398c29d))
+
+
+### Bug Fixes
+
+* Bump from 5.0.0-alpha.0 to 5.0.0-alpha.1 ([#1236](https://github.com/d3xter666/ui5-cli-mono/issues/1236)) ([220452a](https://github.com/d3xter666/ui5-cli-mono/commit/220452a77f6062e24d4473f7eb4098e5d3700aed))
+* Fix gray code blocks in Markdown ([1cdd610](https://github.com/d3xter666/ui5-cli-mono/commit/1cdd61060bd592b5c5f573635444d5ba37a8dc98))
+* **fs:** Tolerate a file vanishing during byGlob ([de2c9de](https://github.com/d3xter666/ui5-cli-mono/commit/de2c9de7dc88c521f9a5148ac215527f26dc5f70))
+
+
+### Dependencies
+
+* Bump globby from 14.1.0 to 16.2.4 ([#1539](https://github.com/d3xter666/ui5-cli-mono/issues/1539)) ([59640d1](https://github.com/d3xter666/ui5-cli-mono/commit/59640d17b5080fd2a3083994299600c7301260dd))
+* Bump ssri from 13.0.1 to 14.0.0 ([#1634](https://github.com/d3xter666/ui5-cli-mono/issues/1634)) ([cf83a19](https://github.com/d3xter666/ui5-cli-mono/commit/cf83a1908485b6cb67c9c236ec3d15ea0835f8c0))
+* Bump the npm group with 7 updates ([77718d7](https://github.com/d3xter666/ui5-cli-mono/commit/77718d760db51a2ab248d0454df1eb3d64facc9a))
+* Require Node.js ^22.22.2 || ^24.15.0 || &gt;=26.0.0 ([#1522](https://github.com/d3xter666/ui5-cli-mono/issues/1522)) ([f02105e](https://github.com/d3xter666/ui5-cli-mono/commit/f02105e9a75a6c82526343dc47c4aaf9bccdc6ae))
+* Update npm dependencies ([0ac8ebb](https://github.com/d3xter666/ui5-cli-mono/commit/0ac8ebbb5ffe9fc6e4455244cf5da50e4c540c5c))
+* The following workspace dependencies were updated
+  * dependencies
+    * @ui5/logger bumped from ^5.0.0-alpha.13 to ^5.0.0-alpha.14
+
 ## [5.0.0-alpha.13](https://github.com/UI5/cli/compare/fs-v5.0.0-alpha.12...fs-v5.0.0-alpha.13) (2026-10-01)
 
 

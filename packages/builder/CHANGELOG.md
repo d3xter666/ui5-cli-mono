@@ -4,6 +4,59 @@ This project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html
 
 A list of unreleased changes can be found [here](https://github.com/SAP/ui5-builder/compare/v4.0.11...HEAD).
 
+## [5.0.0-alpha.14](https://github.com/d3xter666/ui5-cli-mono/compare/builder-v5.0.0-alpha.13...builder-v5.0.0-alpha.14) (2026-10-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* Require Node.js ^22.22.2 || ^24.15.0 || >=26.0.0 ([#1522](https://github.com/d3xter666/ui5-cli-mono/issues/1522))
+* Remove --experimental-css-variables option ([#1484](https://github.com/d3xter666/ui5-cli-mono/issues/1484))
+
+### Features
+
+* **builder:** Adapt build tasks for incremental builds ([ace5ebb](https://github.com/d3xter666/ui5-cli-mono/commit/ace5ebb6bf10b7d72db6397460f12e9040121456))
+* **builder:** Add dynamic section for API reference during JSDoc build ([47970f7](https://github.com/d3xter666/ui5-cli-mono/commit/47970f74c4adf63625e4f330f19090083f563f82))
+* **builder:** Add hierarchical subsection support for API reference sections ([49a3ef5](https://github.com/d3xter666/ui5-cli-mono/commit/49a3ef569074ff84b5f6dfc2cfc619cd1654c2c8))
+* **builder:** Automatically add [@lends](https://github.com/lends) tag to extend calls during JSdoc build ([3547f42](https://github.com/d3xter666/ui5-cli-mono/commit/3547f425b33663f7e5e2618a6d876fe018058d99))
+* **builder:** In JSDoc build, push the deprecation of namespaces down to the contained APIs ([71c08f2](https://github.com/d3xter666/ui5-cli-mono/commit/71c08f2bb1d2cfee34ab9ca2e9e6042b5e67ae0c))
+* **builder:** Mark cross-references to typedefs in the api.json (SDK variant) ([a474700](https://github.com/d3xter666/ui5-cli-mono/commit/a47470050e804192bfab857f6c224faa6e445e10))
+* Remove --experimental-css-variables option ([#1484](https://github.com/d3xter666/ui5-cli-mono/issues/1484)) ([94b57a9](https://github.com/d3xter666/ui5-cli-mono/commit/94b57a93d869dc5286e07e79b9d1690916b55b49))
+
+
+### Bug Fixes
+
+* **builder:** Also detect import.meta as ESM indicator ([5d1dcb7](https://github.com/d3xter666/ui5-cli-mono/commit/5d1dcb719056eba85dc13271493baa8d5cbd1bd1))
+* **builder:** Improve JSDoc support for "module:" syntax ([aca05f0](https://github.com/d3xter666/ui5-cli-mono/commit/aca05f0b75561f33842ccb30248ede3a82f2ae46))
+* **builder:** Improvement of flexBundle flagging in generateFlexBundle ([#1589](https://github.com/d3xter666/ui5-cli-mono/issues/1589)) ([f0b80e7](https://github.com/d3xter666/ui5-cli-mono/commit/f0b80e77aa8494fcb3003248f535832ac18827cd))
+* **builder:** JSDoc: avoid errors when symbol has no events ([6e517e6](https://github.com/d3xter666/ui5-cli-mono/commit/6e517e6c7f480784b93e37e94dcf74e0a689427f))
+* **builder:** Reduce noise from ESM parse errors ([4e7f69a](https://github.com/d3xter666/ui5-cli-mono/commit/4e7f69aede38571dcd4643414ff54ab6131a5c73))
+* **builder:** Skip ESM modules during bundling and log errors ([20bcdf2](https://github.com/d3xter666/ui5-cli-mono/commit/20bcdf212c30569a6aba5c7c61d5717bfd9b1d0b))
+* **builder:** Update lbt/bundle/Resolver to ensure deterministic ordering of raw modules ([9d19923](https://github.com/d3xter666/ui5-cli-mono/commit/9d19923437f41f511cb51fb8477e7a2dec1f0d13))
+* Bump from 5.0.0-alpha.0 to 5.0.0-alpha.1 ([#1236](https://github.com/d3xter666/ui5-cli-mono/issues/1236)) ([220452a](https://github.com/d3xter666/ui5-cli-mono/commit/220452a77f6062e24d4473f7eb4098e5d3700aed))
+* Change Markdown syntax to [@example](https://github.com/example) in one place ([f7e2e73](https://github.com/d3xter666/ui5-cli-mono/commit/f7e2e732570e3948d87c200ed5d64f65891a866d))
+* Fix gray code blocks in Markdown ([1cdd610](https://github.com/d3xter666/ui5-cli-mono/commit/1cdd61060bd592b5c5f573635444d5ba37a8dc98))
+* Remove unnecessary space ([892ebca](https://github.com/d3xter666/ui5-cli-mono/commit/892ebcadbd9ac4a3c0db84c7fb12c8c1e5daa1b6))
+* Strip UTF-8 BOM from resources to prevent corruption in XML and properties files ([#1637](https://github.com/d3xter666/ui5-cli-mono/issues/1637)) ([3538552](https://github.com/d3xter666/ui5-cli-mono/commit/35385526b568cc2e2a521ef4279f955ee1b39b06))
+
+
+### Dependencies
+
+* Bump escape-unicode from 0.2.0 to 0.3.0 ([#1160](https://github.com/d3xter666/ui5-cli-mono/issues/1160)) ([90d07bd](https://github.com/d3xter666/ui5-cli-mono/commit/90d07bdf9703e1072a8453a58302c00ac60ad83e))
+* Bump espree from 10.4.0 to 11.2.0 ([#1381](https://github.com/d3xter666/ui5-cli-mono/issues/1381)) ([29a00b2](https://github.com/d3xter666/ui5-cli-mono/commit/29a00b236e4c410e4a47ccb0842e851ff9e2ab4a))
+* Bump less-openui5 from 0.11.6 to 0.12.0 ([146a8fd](https://github.com/d3xter666/ui5-cli-mono/commit/146a8fde30565e041cf48e36dee030e5744d9124))
+* Bump terser from 5.50.0 to 5.51.1 in the npm group ([#1556](https://github.com/d3xter666/ui5-cli-mono/issues/1556)) ([b844c39](https://github.com/d3xter666/ui5-cli-mono/commit/b844c3948aafd6357b6edb8c7ac3eed047703ede))
+* Bump the npm group with 3 updates ([cd308af](https://github.com/d3xter666/ui5-cli-mono/commit/cd308af1fe6326e9dfc04f11d2fc6a444102712c))
+* Bump the npm group with 7 updates ([77718d7](https://github.com/d3xter666/ui5-cli-mono/commit/77718d760db51a2ab248d0454df1eb3d64facc9a))
+* Bump workerpool from 9.3.4 to 10.0.1 ([#1171](https://github.com/d3xter666/ui5-cli-mono/issues/1171)) ([1f659b4](https://github.com/d3xter666/ui5-cli-mono/commit/1f659b405038f91f6aa62d0cc29c32376e4e24d3))
+* Require Node.js ^22.22.2 || ^24.15.0 || &gt;=26.0.0 ([#1522](https://github.com/d3xter666/ui5-cli-mono/issues/1522)) ([f02105e](https://github.com/d3xter666/ui5-cli-mono/commit/f02105e9a75a6c82526343dc47c4aaf9bccdc6ae))
+* Update npm dependencies ([0ac8ebb](https://github.com/d3xter666/ui5-cli-mono/commit/0ac8ebbb5ffe9fc6e4455244cf5da50e4c540c5c))
+* The following workspace dependencies were updated
+  * dependencies
+    * @ui5/fs bumped from ^5.0.0-alpha.13 to ^5.0.0-alpha.14
+    * @ui5/logger bumped from ^5.0.0-alpha.13 to ^5.0.0-alpha.14
+  * devDependencies
+    * @ui5/project bumped from ^5.0.0-alpha.13 to ^5.0.0-alpha.14
+
 ## [5.0.0-alpha.13](https://github.com/UI5/cli/compare/builder-v5.0.0-alpha.12...builder-v5.0.0-alpha.13) (2026-10-01)
 
 

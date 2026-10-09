@@ -4,6 +4,75 @@ This project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html
 
 A list of unreleased changes can be found [here](https://github.com/SAP/ui5-project/compare/v4.0.6...HEAD).
 
+## [5.0.0-alpha.14](https://github.com/d3xter666/ui5-cli-mono/compare/project-v5.0.0-alpha.13...project-v5.0.0-alpha.14) (2026-10-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* Require Node.js ^22.22.2 || ^24.15.0 || >=26.0.0 ([#1522](https://github.com/d3xter666/ui5-cli-mono/issues/1522))
+* Remove --experimental-css-variables option ([#1484](https://github.com/d3xter666/ui5-cli-mono/issues/1484))
+
+### Features
+
+* Add live status banner to ui5 serve ([#1439](https://github.com/d3xter666/ui5-cli-mono/issues/1439)) ([2a46c8b](https://github.com/d3xter666/ui5-cli-mono/commit/2a46c8b97f3613314cd61507417f97b079943bce))
+* **cli:** Add --cache option for build and serve commands ([#1368](https://github.com/d3xter666/ui5-cli-mono/issues/1368)) ([13e7ac5](https://github.com/d3xter666/ui5-cli-mono/commit/13e7ac5a5f32f603049c900e39eba9c9febf47fe))
+* **cli:** Add ui5 cache clean command ([#1455](https://github.com/d3xter666/ui5-cli-mono/issues/1455)) ([cf1bd9d](https://github.com/d3xter666/ui5-cli-mono/commit/cf1bd9d054c1e74506ccfbd6cc2b2f51847d5a4d))
+* Disable generation of library manifest ([#1533](https://github.com/d3xter666/ui5-cli-mono/issues/1533)) ([7ead3c8](https://github.com/d3xter666/ui5-cli-mono/commit/7ead3c874633abc4febfdef985e97b5458e062c1))
+* **project:** Add "off" mode to UI5_WATCH_MODE to disable file watching ([4b175ff](https://github.com/d3xter666/ui5-cli-mono/commit/4b175ffb48679f58cd8617fefb007fbc8b862498))
+* **project:** Add BuildServer for watch mode and incremental rebuilds ([9d5192d](https://github.com/d3xter666/ui5-cli-mono/commit/9d5192db914e1b5c90869fa8a2d8f124dc6f63da))
+* **project:** Add component type ([46eb4e4](https://github.com/d3xter666/ui5-cli-mono/commit/46eb4e4ec45b26495b5248354966701eb8c6b374))
+* **project:** Add hash-tree-based resource change tracking ([fc9dc4e](https://github.com/d3xter666/ui5-cli-mono/commit/fc9dc4e077486967661d7172bf9a2fa88859ae1e))
+* **project:** Add liveReload server setting and BuildServer event ([15f0c4f](https://github.com/d3xter666/ui5-cli-mono/commit/15f0c4fbe70404486162f365ab1dd7fdb0eba2cb))
+* **project:** Add resource request graph and per-stage/task caches ([6dd1235](https://github.com/d3xter666/ui5-cli-mono/commit/6dd1235fbad2e62595604b4a14f714d9a9b20c92))
+* **project:** Add Specification Version 5.0 ([1452401](https://github.com/d3xter666/ui5-cli-mono/commit/1452401b2a26bc60a34dae2d16ab82e0d78f404c))
+* **project:** Add SQLite-backed build cache storage ([ca96789](https://github.com/d3xter666/ui5-cli-mono/commit/ca96789183909dcd0e9c760eb9e7144efe2d9bf1))
+* **project:** Implement differential builds in ProjectBuilder/TaskRunner ([e7c48b5](https://github.com/d3xter666/ui5-cli-mono/commit/e7c48b5dfea30039a296f909a602e3ef79859667))
+* **project:** Surface per-task written resource paths on task-end event ([be818d1](https://github.com/d3xter666/ui5-cli-mono/commit/be818d1ba8c4d66463f7977f810212a94e4b3ecd))
+* Remove --experimental-css-variables option ([#1484](https://github.com/d3xter666/ui5-cli-mono/issues/1484)) ([94b57a9](https://github.com/d3xter666/ui5-cli-mono/commit/94b57a93d869dc5286e07e79b9d1690916b55b49))
+* **server:** Add serveMiddleware API for Node.js server integration ([93f52eb](https://github.com/d3xter666/ui5-cli-mono/commit/93f52ebb1a8ad70fadc88bc80fbc5ac3b9087ba9))
+
+
+### Bug Fixes
+
+* Bump from 5.0.0-alpha.0 to 5.0.0-alpha.1 ([#1236](https://github.com/d3xter666/ui5-cli-mono/issues/1236)) ([220452a](https://github.com/d3xter666/ui5-cli-mono/commit/220452a77f6062e24d4473f7eb4098e5d3700aed))
+* Fix gray code blocks in Markdown ([1cdd610](https://github.com/d3xter666/ui5-cli-mono/commit/1cdd61060bd592b5c5f573635444d5ba37a8dc98))
+* Fix wrong character ([1565e3e](https://github.com/d3xter666/ui5-cli-mono/commit/1565e3e7d5367cee43f0a0f3030324ac4789bc30))
+* **project:** Add polling file watcher for containers ([535e5ae](https://github.com/d3xter666/ui5-cli-mono/commit/535e5ae0e027b400dc0ad966cd7212a0a4ce1017))
+* **project:** Allow Component.ts ([#1243](https://github.com/d3xter666/ui5-cli-mono/issues/1243)) ([3b8ce29](https://github.com/d3xter666/ui5-cli-mono/commit/3b8ce296d5bc0eb2f6c3452bae7ef0247f3bbd71))
+* **project:** Include @ui5/project version in build signature ([7053fb9](https://github.com/d3xter666/ui5-cli-mono/commit/7053fb9e00c9db95839d2ef0602d85dedaeb77e8))
+* **project:** Memoize in-flight native watcher load to avoid polling race ([073f807](https://github.com/d3xter666/ui5-cli-mono/commit/073f80780bdad7a8bc55180cbee862f8bf5b4126))
+* **project:** Prevent npm config from reading UI5 CLI args ([3c62f0b](https://github.com/d3xter666/ui5-cli-mono/commit/3c62f0b6236e86fdd9395b0b1d0b68f124c9e146))
+* **project:** Route theme-library resources in BuildReader ([af31b26](https://github.com/d3xter666/ui5-cli-mono/commit/af31b267f70f8dbd4e53e27aa180155336d5e4ff))
+* **project:** Treat ENOENT build failures as transient in serve mode ([06c9fd9](https://github.com/d3xter666/ui5-cli-mono/commit/06c9fd9e1572d053b56807a00cc1a8fd22a800c1))
+* **project:** Treat ENOENT during cache validation as transient ([196afe7](https://github.com/d3xter666/ui5-cli-mono/commit/196afe7c0759ddb468f025fb89d0364e727067ed))
+* Show resolved framework version in serve console output ([3210e8b](https://github.com/d3xter666/ui5-cli-mono/commit/3210e8b4f1e212621b03afb6f0b888a32aa19f3e))
+
+
+### Dependencies
+
+* Bump @npmcli/config from 10.12.0 to 11.0.1 ([#1494](https://github.com/d3xter666/ui5-cli-mono/issues/1494)) ([9352f88](https://github.com/d3xter666/ui5-cli-mono/commit/9352f88a6271d1698f48316db0cff3adb1882b59))
+* Bump chalk from 5.6.2 to 6.0.0 ([62a3e39](https://github.com/d3xter666/ui5-cli-mono/commit/62a3e3971ca3079b7cbfb6cfd4c28bd2e902e767))
+* Bump globby from 14.1.0 to 16.2.4 ([#1539](https://github.com/d3xter666/ui5-cli-mono/issues/1539)) ([59640d1](https://github.com/d3xter666/ui5-cli-mono/commit/59640d17b5080fd2a3083994299600c7301260dd))
+* Bump js-yaml ([#1197](https://github.com/d3xter666/ui5-cli-mono/issues/1197)) ([78d312b](https://github.com/d3xter666/ui5-cli-mono/commit/78d312bc62fa7004ddca87f44ca6acac94e9d1fa))
+* Bump js-yaml from 4.3.0 to 4.3.1 ([#1516](https://github.com/d3xter666/ui5-cli-mono/issues/1516)) ([23dad2e](https://github.com/d3xter666/ui5-cli-mono/commit/23dad2e028a6f48150dcada976e019a1858a0b39))
+* Bump js-yaml from 4.3.1 to 5.4.2 ([#1558](https://github.com/d3xter666/ui5-cli-mono/issues/1558)) ([cdc1153](https://github.com/d3xter666/ui5-cli-mono/commit/cdc1153d5cce60a35a2d44c54c8c4dc18f61c1f1))
+* bump make-fetch-happen from 14.0.3 to 15.0.2 ([#1161](https://github.com/d3xter666/ui5-cli-mono/issues/1161)) ([b202c51](https://github.com/d3xter666/ui5-cli-mono/commit/b202c514715f5d8efe3fbfc1fcf73ae84a891925))
+* Bump make-fetch-happen from 15.0.4 to 15.0.5 ([#1341](https://github.com/d3xter666/ui5-cli-mono/issues/1341)) ([a204e65](https://github.com/d3xter666/ui5-cli-mono/commit/a204e65697844b54e1bce51e41fb8c55c7ff158c))
+* Bump pacote from 19.0.1 to 21.0.3 ([#1162](https://github.com/d3xter666/ui5-cli-mono/issues/1162)) ([cb29ec1](https://github.com/d3xter666/ui5-cli-mono/commit/cb29ec17a9bdaedf06e7a41032a97568881209c1))
+* Bump read-package-up from 11.0.0 to 12.0.0 ([#1349](https://github.com/d3xter666/ui5-cli-mono/issues/1349)) ([9d5693a](https://github.com/d3xter666/ui5-cli-mono/commit/9d5693a53388fcd0a43cff033bbb1b347a426c89))
+* Bump read-pkg from 9.0.1 to 10.0.0 ([#1297](https://github.com/d3xter666/ui5-cli-mono/issues/1297)) ([44efc5a](https://github.com/d3xter666/ui5-cli-mono/commit/44efc5abbaadce1ada0c0ebf6720faca5ec1d183))
+* Bump the npm group with 2 updates ([#1612](https://github.com/d3xter666/ui5-cli-mono/issues/1612)) ([191729c](https://github.com/d3xter666/ui5-cli-mono/commit/191729c7b05009c4af4924f84a2d479c19ef922d))
+* Bump the npm group with 3 updates ([#1631](https://github.com/d3xter666/ui5-cli-mono/issues/1631)) ([9e5c985](https://github.com/d3xter666/ui5-cli-mono/commit/9e5c985cf2427669f4bff31fd3832876684a493c))
+* Bump the npm group with 7 updates ([77718d7](https://github.com/d3xter666/ui5-cli-mono/commit/77718d760db51a2ab248d0454df1eb3d64facc9a))
+* Require Node.js ^22.22.2 || ^24.15.0 || &gt;=26.0.0 ([#1522](https://github.com/d3xter666/ui5-cli-mono/issues/1522)) ([f02105e](https://github.com/d3xter666/ui5-cli-mono/commit/f02105e9a75a6c82526343dc47c4aaf9bccdc6ae))
+* Update npm dependencies ([0ac8ebb](https://github.com/d3xter666/ui5-cli-mono/commit/0ac8ebbb5ffe9fc6e4455244cf5da50e4c540c5c))
+* The following workspace dependencies were updated
+  * dependencies
+    * @ui5/fs bumped from ^5.0.0-alpha.13 to ^5.0.0-alpha.14
+    * @ui5/logger bumped from ^5.0.0-alpha.13 to ^5.0.0-alpha.14
+  * peerDependencies
+    * @ui5/builder bumped from ^5.0.0-alpha.13 to ^5.0.0-alpha.14
+
 ## [5.0.0-alpha.13](https://github.com/UI5/cli/compare/project-v5.0.0-alpha.12...project-v5.0.0-alpha.13) (2026-10-01)
 
 

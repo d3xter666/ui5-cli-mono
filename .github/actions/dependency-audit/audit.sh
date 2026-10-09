@@ -104,6 +104,9 @@ extract locked  > "${work}/locked.tsv"
 extract devprod > "${work}/devprod.tsv"
 
 echo "Generating advisory comparison rows..."
+cat "${work}/prod.tsv" "${work}/locked.tsv" "${work}/devprod.tsv"
+echo "====================";
+ls -l
 # Join per advisory, mark presence per scope, sort ships-first then by severity.
 rows="$(
 	{

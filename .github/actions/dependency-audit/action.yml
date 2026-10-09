@@ -19,5 +19,16 @@ runs:
         node-version: ${{ inputs.node-version }}
 
     - name: Run dependency audit (all scopes)
+      id: audit
       shell: bash
       run: bash "${{ github.action_path }}/audit.sh"
+
+    # Separate gate: the audit step above exits 0 so its job summary is uploaded
+    # (a failed step's $GITHUB_STEP_SUMMARY is not rendered). Fail the job here
+    # when that step reported findings, so the summary stays visible AND CI fails.
+    - name: Fail on audit findings
+      if: steps.audit.outputs.failed == '1'
+      shell: bash
+      run: |
+        echo "::error::Dependency audit reported findings — see the job summary for the comparison table."
+        exit 1

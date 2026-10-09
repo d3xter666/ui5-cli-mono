@@ -66,6 +66,7 @@ npm install --no-audit --no-fund --ignore-scripts
 audit_scope "latest (dev + prod)" devprod
 audit_scope "latest (prod only)" prod --skip-dev
 
+echo "Generating comparison summary..."
 # --- Comparison summary ---------------------------------------------------------
 # Advisory ids the repo config allowlists, so the table matches audit-ci's effective verdict.
 allowlist="${work}/allowlist.txt"
@@ -84,6 +85,7 @@ if [ -n "${config_file}" ]; then
 	' "${config_file}" > "${allowlist}" 2>/dev/null || true
 fi
 
+echo "Extracting advisory data..."
 # extract <snapshot>: "ghsa <tab> package <tab> severity <tab> url", allowlisted ids removed.
 extract() {
 	jq -r --rawfile allow "${allowlist}" '
@@ -96,10 +98,12 @@ extract() {
 		| unique_by(.g)[] | [.g, .p, .s, .u] | @tsv
 	' "${work}/$1.json" 2>/dev/null || true
 }
+echo "Advisory data extraction complete."
 extract prod    > "${work}/prod.tsv"
 extract locked  > "${work}/locked.tsv"
 extract devprod > "${work}/devprod.tsv"
 
+echo "Generating advisory comparison rows..."
 # Join per advisory, mark presence per scope, sort ships-first then by severity.
 rows="$(
 	{
@@ -120,6 +124,7 @@ rows="$(
 		}' | sort | cut -f2-
 )"
 
+echo "Advisory comparison rows generated."
 {
 	echo "## Security audit comparison"
 	echo
@@ -132,4 +137,5 @@ rows="$(
 		"Advisories allowlisted in this repo's audit-ci config are excluded."
 } >> "${GITHUB_STEP_SUMMARY:-/dev/stdout}"
 
+echo "Security audit comparison summary generated."
 exit "${failed}"

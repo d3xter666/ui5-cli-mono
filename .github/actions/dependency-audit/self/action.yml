@@ -2,8 +2,8 @@ name: "Dependency security audit (self)"
 description: >
   Self-audit for a repository that owns a published npm package: audits the checked-out source (three
   scopes) AND the latest published version of the package, writes a comparison summary, and fails the
-  job on findings. Reuses the shared scripts in the sibling scripts/ directory via
-  ${{ github.action_path }}/../scripts/*.mjs. The per-target action (../action.yml) is untouched.
+  job on findings. Reuses the shared scripts in the sibling scripts/ directory. The per-target action
+  (../action.yml) is untouched.
 
 inputs:
   node-version:

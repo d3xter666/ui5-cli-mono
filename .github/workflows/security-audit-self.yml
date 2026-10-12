@@ -28,11 +28,10 @@ jobs:
         with:
           persist-credentials: false
 
-      # Local ref: the self action lives in this repo and is available after checkout. Another repo
-      # self-audits by replacing this with the remote action, pinned to a commit SHA:
-      #   uses: d3xter666/ui5-cli-mono/.github/actions/dependency-audit/self@<sha>
+      # Remote ref: action lives in UI5/cli. Pin to a commit SHA once the branch is merged.
+      # While still in review, the branch name is used directly.
       - name: Self audit
-        uses: ./.github/actions/dependency-audit/self
+        uses: UI5/cli/.github/actions/dependency-audit/self@refactor-security-audit
         with:
           package-dir: ${{ inputs.package-dir }}
           package-name: ${{ inputs.package-name }}
